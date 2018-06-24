@@ -1,0 +1,59 @@
+= leateCode:sort-list
+
+=== 题目描述 +
+Sort a linked list in O(n log n) time using constant space complexity.
+
+ 在O(nlogn)时间复杂度内使用常数空间对链表（单向）进行排序
+
+=== 分析 +
+考虑如何对一个链表进行排序，首先链表是单向的，不像数组一样可以进行直接定位，所以和定位相关的hash、插入，
+什么的就可以不考虑了，考虑O(nlogn) 的排序算法有哪些-》归并，归并的本质需要不停的分割分制的思想，如何分割
+对于数组好操作对于链表就需要用 #*快慢*# 指针了.
+
+=== 代码实现
+----
+/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     ListNode *next;
+ *     ListNode(int x) : val(x), next(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    ListNode *sortList(ListNode *head) {
+        if(head==NULL || head->next == NULL) return head;
+        ListNode *slow = head;
+        ListNode *fast = head; //快指针可以和head 一起开始，也可以从head->next 开始
+        //取出中点
+        while(fast == NULL || fast->next == NULL){
+            slow = slow->next;
+            fast = fast->next->next;
+        }
+        ListNode *left =sortList(slow->next);
+        //为什么变为NULL； 是因为要把链表断开为两截，并不会丢失元素
+        slow->next = NULL;
+        ListNode *right = sortList(head);
+        return mergeList(left,right);
+    }
+    //合并数组
+    ListNode *mergeList(ListNode *A,ListNode *B){
+        ListNode dump(0);
+        ListNode *p = &dump;
+        while(A && B){
+            if(A->val < B->val){
+                p->next = A;
+                A = A->next;
+            }else{
+                p->next = B;
+                B = B->next;
+            }
+            p = p->next;
+        }
+        if(A) p->next = A;
+        if(B) p->next = B;
+        return dump.next;
+    }
+};
+----
