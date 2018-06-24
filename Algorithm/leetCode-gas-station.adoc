@@ -1,0 +1,48 @@
+== gas-station
+=== 题目描述
+----
+There are N gas stations along a circular route, where the amount of gas at station i isgas[i].
+
+You have a car with an unlimited gas tank and it costscost[i]of gas to travel from station i to its next station (i+1). You begin the journey with an empty tank at one of the gas stations.
+
+Return the starting gas station's index if you can travel around the circuit once, otherwise return -1.
+
+Note:
+The solution is guaranteed to be unique.
+----
+
+=== 分析
+现在沿路线有N个汽油站分布，现在有每个站i的存油量为gas[i],你有一辆小汽车，假设邮箱可以
+装无限的油，你需要旅行从一个油站到下一个油站，开始的时候你邮箱是空的并且从其中一个加油站出发
+如果你可以沿路旅行一圈，返回从哪个加油站开始可以实现，否则返回 -1、
+假设这个方案只有一个
+
+看到这个问题第一反应就是尽量从油多的地方触发，所谓的油多，是指 存油量-耗油量 剩余量最多，这时候
+如何找到这一站并且确保从这一站出发能够实现目标呢！我们可以模拟试一下，遍历所有站点，只要这个并计算
+剩余油量，如果油量<0 可定不行，就从下一个开始尝试，知道遍历完成之后并且总油量是剩余的。
+
+其实这是一个贪心，贪的是什么呢？贪的是每次我都保证我的剩余油量最少不能小于0，这就是收敛条件
+
+=== 考察点
+贪心
+
+=== 代码实现
+----
+class Solution {
+public:
+    int canCompleteCircuit(vector<int> &gas, vector<int> &cost) {
+        int total = 0;
+        int sum = 0;
+        int index = -1;
+        for(int i=0;i<gas.size();i++){
+            sum+=gas[i]-cost[i];
+            total+= gas[i]-cost[i];
+            if(sum<0){
+                sum = 0;
+                index = i;
+            }
+        }
+        return total>=0?index+1:-1;
+    }
+};
+----
