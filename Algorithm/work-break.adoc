@@ -1,0 +1,44 @@
+== word-break
+=== 题目描述
+----
+Given a string s and a dictionary of words dict, determine if s can be segmented into a space-separated sequence of one or more dictionary words.
+
+For example, given
+s ="leetcode",
+dict =["leet", "code"].
+
+Return true because"leetcode"can be segmented as"leet code".
+----
+=== 分析
+  重点在于是否可以将s分割为dict 中包含的单词所组成的句子，不需要具体的分割。
+很显然，动态规划是比较合适的。
+  我们设定dp[i] 标示为 从s[0] - s[i] 直接可以分割为dict中的单词，必然的初始条件为：dp[0]=true。
+那么只需要穷举所以的组合n*n，更新dp[i],最后一个dp[s.length()] 即为所求。
+
+=== 考察点
+动态规划
+
+=== 代码实现
+
+----
+class Solution {
+public:
+    bool wordBreak(string s, unordered_set<string> &dict) {
+        //dp[i] 表示从0-i之间是否可分词
+        vector <bool> dp(s.length()+1,false);
+        dp[0] = true;
+        for(int pos = 0;pos<s.length() ;pos++){
+            //以每次pos 点为起点 如果 0-pos 可分割，则探测pos 到后续的数据。
+            //因为有一个这样的案例即可标示存在，所有只需要有一种情况到达重点即可结束。
+            for(int j=pos;dp[pos] && j<s.length();j++){
+                if(dict.find(s.substr(pos,j-pos+1))!= dict.end() ){
+                    dp[j+1] = true;
+                    if(j+1 == s.length())
+                        break;
+                }
+            }
+        }
+        return dp[s.length()];
+    }
+};
+----

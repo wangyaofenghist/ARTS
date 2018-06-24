@@ -1,0 +1,46 @@
+== linked-list-cycle
+=== 题目分析
+----
+Given a linked list, determine if it has a cycle in it.
+
+Follow up:
+Can you solve it without using extra space?
+----
+=== 分析
+判断一个链表中是否存在环，可以通过快慢指针，快指针一次走两步，慢指针一次走
+一步，如果存在环两个指针一定会相遇，如果两个指针有一个为NULL 标示没有环。
+
+=== 考察点
+链表，快慢指针，环
+
+=== 代码实现
+----
+/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     ListNode *next;
+ *     ListNode(int x) : val(x), next(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    bool hasCycle(ListNode *head) {
+        if(head==NULL) return false;
+        ListNode *slow = head;
+        ListNode *fast = head;
+        while(fast!=NULL && fast->next !=NULL){
+            fast = fast->next->next;
+            slow = slow->next;
+            if(fast == slow){
+                break;
+            }
+        }
+        if(fast!=NULL && fast->next!=NULL){
+            return true;
+        }
+        return false;
+
+    }
+};
+----
