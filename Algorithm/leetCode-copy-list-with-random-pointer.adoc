@@ -1,0 +1,65 @@
+== copy-list-with-random-pointer
+=== 题目描述
+----
+A linked list is given such that each node contains an additional random pointer which could point to any node in the list or null.
+
+Return a deep copy of the list.
+----
+=== 分析
+    现在有一个单向链表，链表每一个节点，都有一个额外的指针（除了next外）指向链表中的任何一个节点或者是null，对链表
+进行copy 并返回一个新的链表。
+   如果只有一个next 指针，如何copy？其实从头到尾遍历一下，生成一个新的链表即可。加了一个random 指针之后呢？
+由于random 指向的是任意指针或者null，所以并不能遍历复制，因为next 是有序的 random 是无序的。
+   我们思考吧random 编程相对有序的，假如 我们还是复制next 但是放到了原有数据的后面（A->a->B->b ...）那么，
+A->next->random= A->random->next,即可与对random 的关系进行复制。之后将链表奇数位节点留下，偶数位节点拆离，
+即复制完成。此题很考察链表，也很考察我们模拟的能力，可以手工画图模拟一下即可看出规律。
+
+=== 考察点
+链表
+
+=== 代码实现
+----
+/**
+ * Definition for singly-linked list with a random pointer.
+ * struct RandomListNode {
+ *     int label;
+ *     RandomListNode *next, *random;
+ *     RandomListNode(int x) : label(x), next(NULL), random(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    RandomListNode *copyRandomList(RandomListNode *head) {
+        if(head==NULL)
+            return head;
+        RandomListNode *p = head;
+        RandomListNode *tmp;
+        RandomListNode *newN;
+        //便利链表 构造 每一个元素放到原来元素的后面
+        while(p!=NULL){
+            tmp = p->next;
+            newN = new RandomListNode(p->label);
+            p->next = newN;
+            newN->next = tmp;
+            p = tmp;
+        }
+        //将random 指针进行复制
+        p = head;
+        while(p!=NULL){
+            if(p->random !=NULL){
+                p->next->random = p->random->next;
+            }
+            p = p->next->next;
+        }
+        p = head;
+        //要返回的头指针
+        RandomListNode *res = head->next;
+        while(p->next != NULL){
+            tmp = p->next;
+            p->next = p->next->next;
+            p = tmp;
+        }
+        return res;
+    }
+};
+----

@@ -1,0 +1,67 @@
+== leetCode-single-number-ii
+== 题目描述
+----
+Given an array of integers, every element appears three times except for one. Find that single one.
+
+Note:
+Your algorithm should have a linear runtime complexity. Could you implement it without using extra memory?
+----
+
+=== 分析
+   一个数组中有一个值只出现了一次，其余的值都出现了三次，找到这个出现一次的值
+并且希望算法的时间复杂度曲线与线性时间，可以考虑如果不用额外的内存应该如何去做？
+   首先，通过hash计数，最后遍历出来出现次数为1 的那个数，线性时间，但是使用了O(n)的空间？
+现在考虑一个问题，假如说出现的重复数据改为了两次，如何找打只出现一次的数值？
+可以简单的通过亦或 ^ 符号去做，两个相同的数进行异或 结果为0 ，最后剩余的自然就是出现了一次的数。
+现在在这个问题的基础上增加了难度，重复次数变为了3次，如果我们通过某个算法可以将连续出现3的的数也归0
+那么剩余的数自然就是出现一次的。
+   现在换一个角度，异或 是将 某一个bit 位出现两次1 之后就清 0 ，我们来构造一个 出现三次 1 的时候清0是否可以？
+参考牛客中的一个解答：
+----
+用ones来记录只出现过一次的bits，用twos来记录只出现过两次的bits，ones&twos实际上就记录了出现过三次的bits，
+这时候我们来模拟进行出现3次就抵消为0的操作，抹去ones和twos中都为1的bits
+----
+ones 中准确来说利用异或只保存出现奇数次数的bit位，two 利用 one & t 去保留出现两次的bit位为1的值 之后 | twos 将结果进行累计
+ones & twos 即为 出现 3次1 的bit位，之后将 three 中的 1 的与ones 、twos 中相应位置 清零（ones & （~three））即可
+=== 考察点
+hash，位操作，知识转换
+=== 代码实现
+----
+class Solution {
+public:
+    int singleNumber(int A[], int n) {
+        int ones = 0;
+        int twos = 0;
+        int three = 0;
+        int t = 0;
+        for(int i = 0;i<n;i++){
+            t = A[i];
+            //拿 ones & t 表示出现两次 | tows 表示不停将两次的值 加入twos
+            twos = twos | (ones & t);
+            //异或，得到的是 数组中所有的值 ^ 一次
+            ones = ones ^ t;
+            //合并ones 和 tows 构造出现三次的值
+            three = ones & twos;
+            //相应 为1 的位置清0
+            ones = ones & (~three);
+            twos = twos & (~three);
+        }
+        return ones;
+    }
+};
+----
+
+如果是重复次数改为2，直接用异或
+----
+class Solution {
+public:
+    int singleNumber(int A[], int n) {
+        if(n==0)return n;
+        int tmp = 0;
+        for(int i=0;i<n;i++){
+            tmp =tmp^A[i];
+        }
+        return tmp;
+    }
+};
+----
