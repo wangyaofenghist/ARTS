@@ -1,0 +1,51 @@
+== candy
+=== 题目描述
+----
+There are N children standing in a line. Each child is assigned a rating value.
+
+You are giving candies to these children subjected to the following requirements:
+
+Each child must have at least one candy.
+Children with a higher rating get more candies than their neighbors.
+What is the minimum candies you must give?
+----
+=== 分析
+一排有n个孩子，每个孩子都有一个等级值，你需要给孩子发糖果，并且满足一下要求
+1. 每一个孩子最少一个糖果
+2. 等级高的孩子的糖果要多与左右邻居的糖果。
+3. 你应该用最少的糖果做这件事。
+其中最难的其实是第二条，我们可以模拟一下这种场景，将等级值换成身高，你要保证身高更高的人比他的左右的糖果更多
+这个如何保证？
+假如我们从前向后遍历，只要发现后一个值大于前一个（rating[i]>rating[i-1]） 那么对应 candy[i] = candy[i-1]+1，
+遍历完成之后，再从后向前遍历，这个时候条件就变成 如果 后面的值比前面的值小（rating[j] <ratingp[j-1]）并且 后面的
+糖果也大于等于前面的值 （candy[j]>=candy[j-1]） 则 candy[i-1] = candy[i]+1;
+之后统计candy数据即可。
+
+=== 考察点
+动态规划，模拟
+
+=== 代码实现
+----
+class Solution {
+public:
+    int candy(vector<int> &ratings) {
+        int len = ratings.size();
+        int sum = 0;
+        vector <int> candy (len+1,1);
+        for(int i=1;i<len;i++){
+            if(ratings[i]>ratings[i-1]){
+                candy[i] = candy[i-1]+1;
+            }
+        }
+        for(int i=len-1;i>=1;i--){
+            if(ratings[i]<ratings[i-1] && candy[i-1]<=candy[i] ){
+                candy[i-1] = candy[i]+1;
+            }
+        }
+        for(int i=0;i<len;i++){
+            sum += candy[i];
+        }
+        return sum;
+    }
+};
+----
