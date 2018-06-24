@@ -1,0 +1,85 @@
+== binary-tree-postorder-traversal || binary-tree-preorder-traversal
+=== 题目描述
+----
+Given a binary tree, return the postorder traversal of its nodes' values.
+
+For example:
+Given binary tree{1,#,2,3},
+
+   1
+    \
+     2
+    /
+   3
+
+return[3,2,1].
+
+Note: Recursive solution is trivial, could you do it iteratively?
+----
+
+=== 分析
+    要将前序/后序遍历的结果返回，不同于以往的直接前序遍历中输出，需要将结果存入数组，比较简单，不再做过多分析
+
+=== 考察点
+树，递归，前序遍历
+
+=== 代码实现
+后序
+----
+/**
+ * Definition for binary tree
+ * struct TreeNode {
+ *     int val;
+ *     TreeNode *left;
+ *     TreeNode *right;
+ *     TreeNode(int x) : val(x), left(NULL), right(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    vector<int> postorderTraversal(TreeNode *root) {
+        vector <int> tmp;
+        if(root){
+            postorderTraversal(root,tmp);
+        }
+        return tmp;
+    }
+private:
+    //递归解法
+    void postorderTraversal(TreeNode *root,vector <int> &tmp){
+        if(root->left) postorderTraversal(root->left,tmp);
+        if(root->right) postorderTraversal(root->right,tmp);
+        tmp.push_back(root->val);
+        return;
+    }
+
+};
+----
+前序
+----
+/**
+ * Definition for binary tree
+ * struct TreeNode {
+ *     int val;
+ *     TreeNode *left;
+ *     TreeNode *right;
+ *     TreeNode(int x) : val(x), left(NULL), right(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    vector<int> preorderTraversal(TreeNode *root) {
+        vector <int> tmp;
+        if(root){
+              preorderTraversal(root,tmp);
+        }
+        return tmp;
+    }
+private:
+    void preorderTraversal(TreeNode *root,vector <int> &tmp){
+        tmp.push_back(root->val);
+        if(root->left) preorderTraversal(root->left,tmp);
+        if(root->right) preorderTraversal(root->right,tmp);
+    }
+};
+----

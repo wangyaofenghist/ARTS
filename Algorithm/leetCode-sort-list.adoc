@@ -1,4 +1,4 @@
-= leateCode:sort-list
+== leateCode:sort-list
 
 === 题目描述 +
 Sort a linked list in O(n log n) time using constant space complexity.
@@ -9,7 +9,8 @@ Sort a linked list in O(n log n) time using constant space complexity.
 考虑如何对一个链表进行排序，首先链表是单向的，不像数组一样可以进行直接定位，所以和定位相关的hash、插入，
 什么的就可以不考虑了，考虑O(nlogn) 的排序算法有哪些-》归并，归并的本质需要不停的分割分制的思想，如何分割
 对于数组好操作对于链表就需要用 #*快慢*# 指针了.
-
+=== 考察点
+链表，归并，递归
 === 代码实现
 ----
 /**

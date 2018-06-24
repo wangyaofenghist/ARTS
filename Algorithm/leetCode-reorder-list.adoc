@@ -1,0 +1,81 @@
+== reorder-list
+=== 题目描述
+----
+Given a singly linked list L: L 0→L 1→…→L n-1→L n,
+reorder it to: L 0→L n →L 1→L n-1→L 2→L n-2→…
+
+You must do this in-place without altering the nodes' values.
+
+For example,
+Given{1,2,3,4}, reorder it to{1,4,2,3}.
+----
+=== 分析
+难点在于，对于单项链表，l0->ln->l1->l(n-1)->...,这个过程中l0，l1,l2 都可以顺序取到，但是ln，l(n-1) ...,
+是没有办法在单向链表中顺序取出的，所以考虑将链表 L 一分为二，La(前) ，Lb（后）,在将Lb 倒置 （前插法）,之后合并
+两个链表即可。平均的分割链表，利用快慢指针即可。
+
+=== 考察点
+链表，归并
+
+=== 代码实现
+----
+/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     ListNode *next;
+ *     ListNode(int x) : val(x), next(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    void reorderList(ListNode *head) {
+        if(head==NULL) return;
+        ListNode * slow = head;
+        ListNode * fast = head;
+        ListNode * pre;
+        ListNode *curNext;
+        //找到队列分界点
+        while(fast!=NULL && fast->next!=NULL){
+            slow = slow->next;
+            fast = fast->next->next;
+        }
+        //将队列后半截 位置颠倒
+        pre = slow->next;
+        if(pre!=NULL && pre->next != NULL){
+            curNext = pre->next;
+            while(curNext!=NULL){
+                //pre 向前走一步
+                pre->next = curNext->next ;
+                //当前指针的next 指向开头
+                curNext->next = slow->next;
+                //开头指针指向 当前
+                slow->next = curNext;
+                //当前指针回到pre指针指向位置为下一循环做准备
+                curNext = pre->next;
+            }
+        }
+        //合并两个队列
+        mergeList(head,slow);
+        return;
+
+    }
+    //合并两个队列
+    void mergeList(ListNode *head,ListNode *slow){
+        ListNode *p=head;
+        ListNode *q=slow->next;
+        while(p!=NULL && q!=NULL){
+            //向前走一步
+            slow->next=q->next;
+            //开始合并
+            q->next=p->next;
+            p->next=q;
+            //q 与 slow-》next 重合
+            q=slow->next;
+            //p 指向next 的next
+            p=p->next->next;
+        }
+        return ;
+    }
+};
+----
