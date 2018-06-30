@@ -18,6 +18,8 @@ Return1since the palindrome partitioning["aa","b"]could be produced using 1 cut.
 我们假设 dp[i] 标示 长度为i-len的最小分割数，p[i][j] 标示 从i-j的位置是否可以分割，
 接下来我们只需要穷举所有 存在的回文数，以使得 dp 的值趋向于最小，最后dp[0] 即为所求
 ----
+=== 考察点
+动态规划
 
 === 代码实现
 ----
