@@ -1,0 +1,43 @@
+== palindrome-partitioning-ii
+=== 题目描述
+----
+Given a string s, partition s such that every substring of the partition is a palindrome.
+
+Return the minimum cuts needed for a palindrome partitioning of s.
+
+For example, given s ="aab",
+Return1since the palindrome partitioning["aa","b"]could be produced using 1 cut.
+----
+
+=== 分析
+给出一个字符串s,分割出每一个是回文串的子串，返回s最小需要的分割的次数。
+
+要求求出 字符串s最小的分割数，并且分割的必须是回文数，首先看一下最小的回文数是单个字符，也就是说 s 最多分割len（s）次
+要求求出最小值，肯定需要穷举所有可能的情况，必然存在二维循环。
+----
+我们假设 dp[i] 标示 长度为i-len的最小分割数，p[i][j] 标示 从i-j的位置是否可以分割，
+接下来我们只需要穷举所有 存在的回文数，以使得 dp 的值趋向于最小，最后dp[0] 即为所求
+----
+
+=== 代码实现
+----
+  int minCut(string s){
+    int len = s.size();
+    int dp[len+1];
+    bool p[len][len];
+    fill_n(&p[0][0],len*len,false);
+    for(int i=0;i<=len;i--){
+      dp[i] = len-i;
+    }
+    //回文穷举
+    for(int i=len-1;i>=0;i-- ){
+      for(int j=i;j<len;j++){
+        if（s[i]==s[j] &&(j-i<2 || p[i+1][j-1])）{
+          p[i][j] = true;
+          dp[i] = min(dp[i],dp[j+1]+1)
+        }
+      }
+    }
+    return dp[0]-1;
+  }
+----

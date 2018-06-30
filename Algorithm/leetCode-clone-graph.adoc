@@ -1,0 +1,70 @@
+== clone-graph
+=== 题目描述
+----
+Clone an undirected graph. Each node in the graph contains alabeland a list of itsneighbors.
+OJ's undirected graph serialization:
+Nodes are labeled uniquely.
+
+We use#as a separator for each node, and,as a separator for node label and each neighbor of the node.
+
+As an example, consider the serialized graph{0,1,2# 1,2# 2,2}.
+
+The graph has a total of three nodes, and therefore contains three parts as separated by#.
+
+First node is labeled as0. Connect node0to both nodes1and2.
+Second node is labeled as1. Connect node1to node2.
+Third node is labeled as2. Connect node2to node2(itself), thus forming a self-cycle.
+
+Visually, the graph looks like the following:
+
+       1
+      / \
+     /   \
+    0 --- 2
+         / \
+         \_/
+----
+
+=== 分析
+克隆一个无向图，每个节点都包好一个邻接表
+节点值是唯一的，我们使用#来分割节点以及值
+图的复制说白了就是BFS（广度优先）、DFS（深度优先），对图走一遍，然后clone 即可
+一般来说 BFS 需要配合队列实现，DFS 需要配合回溯、递归 进行实现
+=== 考察点
+图，BFS、DFS
+
+=== 代码实现
+
+深度优先，用map保存新旧值的映射关系
+
+----
+/**
+ * Definition for undirected graph.
+ * struct UndirectedGraphNode {
+ *     int label;
+ *     vector<UndirectedGraphNode *> neighbors;
+ *     UndirectedGraphNode(int x) : label(x) {};
+ * };
+ */
+class Solution {
+public:
+    std::map<UndirectedGraphNode *,UndirectedGraphNode *> m;
+    std::map<UndirectedGraphNode *,UndirectedGraphNode *>::iterator iter;
+    UndirectedGraphNode *cloneGraph(UndirectedGraphNode *node) {
+        if(!node) return node;
+        return cloneGraphHelp(node);
+    }
+    UndirectedGraphNode *cloneGraphHelp(UndirectedGraphNode *node){
+        iter = m.find(node);
+        if(iter != m.end()) return iter->second;
+        UndirectedGraphNode *p;
+        p = new UndirectedGraphNode(node->label);
+        std::pair<UndirectedGraphNode *,UndirectedGraphNode *>tmp(node,p);
+        m.insert(tmp);
+        for(int i=0;i<node->neighbors.size();i++){
+            p->neighbors.push_back(cloneGraphHelp(node->neighbors[i]));
+        }
+        return p;
+    }
+};
+----
