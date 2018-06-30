@@ -27,5 +27,5 @@ curl: (28) Operation timed out after 1002 milliseconds with 0 bytes received
 127.0.0.1 - - [29/Jun/2018:19:34:57 +0800] "GET /499test.php HTTP/1.1" 499 0 "-" "curl/7.54.0"
 ----
 服务端3s后才会输出，而客户端（curl）限定了1s超时，所以客户端在1s之内拿不到数据
-超过了1s 自动中断，nginx 触发409。但是此时 php 还在运行。可以通过客户端打印日志和php端同时打印日
+超过了1s 自动中断，nginx 触发499。但是此时 php 还在运行。可以通过客户端打印日志和php端同时打印日
 志进行验证，会发现nginx 是在客户端中断的时候就已经触发了。
