@@ -1,0 +1,88 @@
+== surrounded-regions
+=== 题目描述
+----
+Given a 2D board containing'X'and'O', capture all regions surrounded by'X'.
+
+A region is captured by flipping all'O's into'X's in that surrounded region .
+
+For example,
+
+X X X X
+X O O X
+X X O X
+X O X X
+
+After running your function, the board should be:
+
+X X X X
+X X X X
+X X X X
+X O X X
+----
+=== 分析
+在一个二维面板中 填充有 X 和 O ，找到X包围的所有区域，并将区域中的 O转换为X
+
+X所包围的所有区域 其实可以理解为除了 四条边上的 O 连接的 O区域 不需要转换为X
+区域的O都转换为X，
+其实我的理解也可以用广度优先的，只是需要配合队列，更复杂而已
+----
+也就是说，可以通过 dfs、bfs 去从上下左右 四条边探测，将所有探测到的 O修改为 *，然后遍历所有，将* 改为O
+将 非*的所有改为X
+----
+
+=== 考察点
+DFS，数组
+
+=== 代码实现
+
+----
+class Solution {
+public:
+    int rowNum = 0;
+    int colNum = 0;
+    void solve(vector<vector<char>> &board) {
+        if(board.size() <=0 || board[0].size()<=0) return ;
+        rowNum = board.size();
+        colNum = board[0].size();
+        //上边 下边
+        for(int i=0;i<colNum;i++){
+            dfs(board,0,i);
+            dfs(board,rowNum-1,i);
+        }
+        //左边 右边
+        for(int i=0;i<rowNum;i++){
+            dfs(board,i,0);
+            dfs(board,i,colNum-1);
+        }
+        //遍历修改
+        for(int i = 0;i<rowNum;i++){
+            for(int j = 0;j<colNum;j++){
+                if(board[i][j]=='*'){
+                    board[i][j]='O';
+                }else{
+                    board[i][j]='X';
+                }
+            }
+        }
+    }
+    //深度遍历  探索 row，col 点的上 左 下 右 四个方向是否为 O
+    void dfs(vector <vector <char> > &board,int row,int col){
+        if(board[row][col] == 'O'){
+            board[row][col] = '*';
+            if(row>1){
+                dfs(board,row-1,col);
+            }
+            if(col>1){
+                dfs(board,row,col-1);
+            }
+            if(row<rowNum-1){
+                dfs(board,row+1,col);
+            }
+            if(col<colNum-1){
+                dfs(board,row,col+1);
+            }
+        }
+        return ;
+    }
+};
+----

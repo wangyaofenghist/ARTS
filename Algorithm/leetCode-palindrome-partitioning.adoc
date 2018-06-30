@@ -1,0 +1,92 @@
+== palindrome-partitioning
+=== 题目描述
+----
+Given a string s, partition s such that every substring of the partition is a palindrome.
+
+Return all possible palindrome partitioning of s.
+
+For example, given s ="aab",
+Return
+
+  [
+    ["aa","b"],
+    ["a","a","b"]
+  ]
+
+----
+=== 分析
+
+此题需要得到所有的分割方式，并且要保证每个都是回文数，已经不同于 版本II 不能使用动态规划了.
+涉及到所有的组合，第一想法就是回溯，看一下基本模板
+----
+void aaa(a,b,...){
+  1. 收敛条件
+  2.
+    for（...）{
+      // 处理逻辑逻辑
+      ...
+      // 构成回溯
+      if（）{
+        push（）
+        aaa()
+        pop()
+      }
+    }
+}
+----
+
+=== 考察点
+
+字符串，组合
+
+=== 代码实现
+
+----
+class Solution {
+public:
+    vector<vector<string>> partition(string s) {
+        vector <vector <string> > res;
+        vector <string> path;
+        partition(s,path,res);
+        return res;
+    }
+private:
+    void partition(string s,vector<string> &path,vector<vector <string> > &res){
+        //收敛条件
+        if(s.size()<1){
+            res.push_back(path);
+            return ;
+        }
+        //分别进行判断
+        for(int i=0;i<s.size();i++){
+            int begin = 0;
+            int end =i;
+            //是否是回文判断
+            bool result = isPalindrome(s,begin,end);
+            //是回文数，说明可以进行接下来的 探测了
+            if(result==true ){
+                path.push_back(s.substr(0,i+1));
+                //递归
+                partition(s.substr(i+1),path,res);
+                path.pop_back();
+            }
+        }
+    }
+    bool isPalindrome(string s,int &begin,int &end){
+        //挨个判断是否回文
+        while(begin!=end){
+            if(s[begin] == s[end]){
+                begin++;
+                end--;
+            }else{
+                break;
+            }
+        }
+        if(begin >= end)
+            return true;
+        else
+            return false;
+    }
+
+};
+----
