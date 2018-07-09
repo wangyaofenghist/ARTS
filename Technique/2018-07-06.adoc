@@ -1,0 +1,226 @@
+== golang中如何 捕获下层 panic
+=== 分析
+加入在一段代码中，底层有panic 抛出，上层要进行捕获，并对外屏蔽panic 细节，比如说收到 panic 后返回对应的错误码进行标示 +
+例如：
+----
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+func main() {
+	err := doStuff()
+	fmt.Println(err)
+}
+
+func pressButton() {
+	fmt.Println("I'm Mr. Meeseeks, look at me!!")
+	// other stuff then happens, but if Jerry asks to
+	// remove 2 strokes from his golf game...
+	panic("It's gettin' weird!")
+}
+
+func doStuff() error {
+	var err error
+	// If there is a panic we need to recover in a deferred func
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New("the meeseeks went crazy!")
+		}
+	}()
+
+	pressButton()
+	return err
+}
+
+----
+结果 (并不符合预期)：
+----
+I'm Mr. Meeseeks, look at me!!
+<nil>
+----
+因为defer 是在函数执行返回前，才会执行，defer 去捕获panic我们如何解决这个问题，
+其实只需要 将 “func doStuff() error” 修改为 “func doStuff() (err error)”即可
+我们看一下实例。
+----
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+func main() {
+	err := doStuff()
+	fmt.Println(err)
+}
+
+func pressButton() {
+	fmt.Println("I'm Mr. Meeseeks, look at me!!")
+	// other stuff then happens, but if Jerry asks to
+	// remove 2 strokes from his golf game...
+	panic("It's gettin' weird!")
+}
+
+func doStuff() (err error) {
+	// If there is a panic we need to recover in a deferred func
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New("the meeseeks went crazy!")
+		}
+	}()
+
+	pressButton()
+	return err
+}
+/*output
+I'm Mr. Meeseeks, look at me!!
+the meeseeks went crazy!
+*/
+----
+
+同样我们可以利用这个性质进行一些其他操作，比如修改返回值，对返回值进行过滤或清洗
+----
+func main() {
+      fmt.Println(c()) //the result is 5
+  }
+
+  // the c function returned value is named j
+  func c() (j int)  {
+      defer changei(&j)
+      return 6
+  }
+  func changei(j *int) {
+      //now j is 6 because it was assigned by return statement
+      // and if i change guess what?! i changed the returned value
+      *j--;
+  }
+
+----
+----
+func main() {
+      fmt.Println(c()) //the result will become 6
+  }
+
+  // the c function returned value is not named at this time
+  func c() int  {
+      j := 1
+      defer changei(&j)
+      return 6
+  }
+  func changei(j *int) {
+      //now j = 1
+      // and if i change guess what?! it will not effects the returned value
+      *j--;
+  }
+----
+思考：
+为什么会出现这种情况呢？
+go func 函数运行返回值在定义的时候就指定返回的变量名，所以在函数启动的时候，返回值默认为其zero 值
+而 defer 的本质 是在函数返回前 进行执行，因为return 返回不是原子操作，可以拆分为两部
+【返回值=xxx；return 】，所以defer 是可以修改返回值的，那也意味着如果defer 修改的是地址，也是可以实现
+相同的结果的。
+----
+返回值 = xxx
+调用defer函数
+空的return
+----
+无名返回值的情况
+----
+package main
+
+import (
+	"fmt"
+)
+
+func main() {
+	fmt.Println("return:", a()) // 打印结果为 return: 0
+}
+
+func a() int {
+	var i int
+	defer func() {
+		i++
+		fmt.Println("defer2:", i) // 打印结果为 defer: 2
+	}()
+	defer func() {
+		i++
+		fmt.Println("defer1:", i) // 打印结果为 defer: 1
+	}()
+	return i
+}
+----
+有名返回值的情况
+----
+package main
+
+import (
+	"fmt"
+)
+
+func main() {
+	fmt.Println("return:", b()) // 打印结果为 return: 2
+}
+
+func b() (i int) {
+	defer func() {
+		i++
+		fmt.Println("defer2:", i) // 打印结果为 defer: 2
+	}()
+	defer func() {
+		i++
+		fmt.Println("defer1:", i) // 打印结果为 defer: 1
+	}()
+	return i // 或者直接 return 效果相同
+}
+----
+
+----
+package main
+
+import (
+	"fmt"
+)
+
+func main() {
+	fmt.Println("c return:", *(c())) // 打印结果为 c return: 2
+}
+
+func c() *int {
+	var i int
+	defer func() {
+		i++
+		fmt.Println("c defer2:", i) // 打印结果为 c defer: 2
+	}()
+	defer func() {
+		i++
+		fmt.Println("c defer1:", i) // 打印结果为 c defer: 1
+	}()
+	return &i
+}
+----
+先来假设出结论，帮助大家理解原因：
+
+1. 多个defer的执行顺序为“后进先出”；
+
+2. defer、return、返回值三者的执行逻辑应该是：return最先执行，return负责将结果写入返回值中；接着defer开始执行一些收尾工作；最后函数携带当前返回值退出。
+
+如何解释两种结果的不同：
+上面两段代码的返回结果之所以不同，其实从上面第2条结论很好理解。
+
+a()int 函数的返回值没有被提前声名，其值来自于其他变量的赋值，而defer中修改的也是其他变量，而非返回值本身，因此函数退出时返回值并没有被改变。
+
+b()(i int) 函数的返回值被提前声名，也就意味着defer中是可以调用到真实返回值的，因此defer在return赋值返回值 i 之后，再一次地修改了 i 的值，最终函数退出后的返回值才会是defer修改过的值。
+
+虽然 c()*int 的返回值没有被提前声明，但是由于 c()*int 的返回值是指针变量，
+那么在return将变量 i 的地址赋给返回值后，defer再次修改了 i 在内存中的实际值，
+因此函数退出时返回值虽然依旧是原来的指针地址，但是其指向的内存实际值已经被成功修改了。
+
+
+参考：
+https://tiancaiamao.gitbooks.io/go-internals/content/zh/03.4.html
+https://stackoverflow.com/questions/37248898/how-does-defer-and-named-return-value-work-in-golang
+
+https://www.calhoun.io/using-named-return-variables-to-capture-panics-in-go/
