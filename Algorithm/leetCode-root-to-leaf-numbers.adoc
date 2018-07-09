@@ -1,0 +1,64 @@
+== sum-root-to-leaf-number
+=== 题目描述
+----
+Given a binary tree containing digits from0-9only, each root-to-leaf path could represent a number.
+
+An example is the root-to-leaf path1->2->3which represents the number123.
+
+Find the total sum of all root-to-leaf numbers.
+
+For example,
+
+    1
+   / \
+  2   3
+
+The root-to-leaf path1->2represents the number12.
+The root-to-leaf path1->3represents the number13.
+
+Return the sum = 12 + 13 =25.
+----
+=== 分析
+给出一颗二叉树，每个节点的值为0-9的范围，每个跟到叶节点的路径都可以标示一个数字
+求出这些数字的和。
+本质在考树的遍历（深度遍历，广度，前序，中序，后续），从跟节点root 到叶子节点组成一个
+数字，很大程度上就是前序遍历，每遍历一层原有数据*10 + current-val,最后累加左右子树即可。
+由于每一层可能都有两个分支，所以可以用递归思想来解决
+
+=== 考察点
+树，递归
+
+=== 代码
+----
+/**
+ * Definition for binary tree
+ * struct TreeNode {
+ *     int val;
+ *     TreeNode *left;
+ *     TreeNode *right;
+ *     TreeNode(int x) : val(x), left(NULL), right(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    int sumNumbers(TreeNode *root) {
+        if(root ==NULL)
+            return 0;
+        int sum = 0;
+        return sumNumbers(root,sum);;
+    }
+    //前序遍历 递归思路
+    int sumNumbers(TreeNode *root ,int sum){
+        if(root==NULL)
+            return 0;
+        //通项公式 以后sum 基础上 *10 加上当前值
+        sum = sum*10 + root->val;
+        if(root->left == NULL && root->right == NULL){
+            return sum;
+        }
+        //递归累加
+        return sumNumbers(root->left,sum) + sumNumbers(root->right,sum);
+
+    }
+};
+----
