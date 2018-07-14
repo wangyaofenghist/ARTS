@@ -1,6 +1,7 @@
 == arts
 === Algorithm
 include::../Algorithm/leetCode-longest-consecutive-sequence.adoc[]
+
 include::../Algorithm/leetCode-root-to-leaf-numbers.adoc[]
 
 === Review
