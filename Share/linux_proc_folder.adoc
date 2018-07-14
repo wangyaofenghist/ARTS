@@ -134,4 +134,21 @@ cancelled_write_bytes: 0
 12.status — 与stat所提供信息类似，但可读性较好，每行表示一个属性信息；
 13.task — 目录文件，包含由当前进程所运行的每一个线程的相关信息，每个线程的相关信息文件均保存在一个由线程号（tid）命名的目录中，这类似于其内容类似于每个进程目录中的内容；（内核2.6版本以后支持此功能）
 ----
+最后我们来对fd 做一个测试，既然在fd里面可以找到 标准输入 标准输出 的文件描述符，我们是否可以利用它对程序进行输入输出呢？
+我们简单的写一段代码，但是结果是程序直接进行了输出并没有触发任何逻辑
+----
+package main
+
+import "fmt"
+
+func main() {
+	var str string
+	for i := 0; i < 10; i++ {
+		fmt.Scanln(&str)
+		fmt.Printf("INPUT:%s\n", str)
+	}
+}
+
+----
+image::../img/WX20180714-144915@2x.png[]
 参考： https://www.cnblogs.com/DswCnblog/p/5780389.html[linux /proc目录详解]
