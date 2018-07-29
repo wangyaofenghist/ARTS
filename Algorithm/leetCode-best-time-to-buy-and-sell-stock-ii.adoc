@@ -1,0 +1,40 @@
+== best-time-to-buy-and-sell-stock-ii
+=== 题目描述
+----
+Say you have an array for which the i th element is the price of a given stock on day i.
+
+Design an algorithm to find the maximum profit. You may complete as many transactions as you like (ie, buy one and sell one share of the stock multiple times). However, you may not engage in multiple transactions at the same time (ie, you must sell the stock before you buy again).
+
+----
+=== 分析
+给定一个数组，第i个值标示第i天的股价，假设现在你可以进行多次交易，找出一个最大的值。
+举例分析一下：
+----
+数组：[1,3,5,2,7,8,6,4]
+我们如果想得到最大的收益，其实只要舍弃负的收益即可，何为负的收益？就是高价买了底价卖了即为负的收益。
+所以我们只需要将递增序列的两两差值累加即可，为何不是挑一个最低的买一个最高的卖？因为在整个递增过程中
+肯定会命中最低的和最高的。如果找最低的买最高的卖，会丢失中间小幅度的涨幅情况。
+----
+
+贪婪思想，贪的是每一次卖都要赚钱，如果赔钱就舍弃。
+
+=== 考察点
+贪婪
+
+=== 代码实现
+----
+class Solution {
+public:
+    int maxProfit(vector<int> &prices) {
+        if(prices.size() <2) return 0;
+        int sum = 0;
+        for(int i=1;i<prices.size();i++){
+            //如果当天的价格高于昨天的就可以累加差值了
+            if(prices[i]>prices[i-1]){
+                sum += prices[i]-prices[i-1];
+            }
+        }
+        return sum;
+    }
+};
+----

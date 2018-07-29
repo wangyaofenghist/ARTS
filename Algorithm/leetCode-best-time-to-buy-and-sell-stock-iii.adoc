@@ -1,0 +1,43 @@
+== best-time-to-buy-and-sell-stock-iii
+=== 题目描述
+----
+Say you have an array for which the i th element is the price of a given stock on day i.
+
+Design an algorithm to find the maximum profit. You may complete at most two transactions.
+
+Note:
+You may not engage in multiple transactions at the same time (ie, you must sell the stock before you buy again).
+----
+
+=== 分析
+给定一个数组，第i个数组标示第i天股票的价格，最多允许交易两次，找出最大的收益数。不能再同时进行多次交易，必须卖出前一次的才能进行下一次交易
+我们在这里尝试用一下贪婪思想，先抽象两次交易，一次完整的交易包括买进和卖出。buy1，sell1 标示以一次买进价格和卖出收益的价格，buy2，sell2标示第二次
+买进后第一次剩余收益和卖出后总共的收益。我们如何进行贪婪？我们贪的是sell2最后的价值最高，就必须的保证buy2的时候剩余价值最高也就是支出最低，以此类推sell1的收益应该在局部最高，buy1的纯粹支出应该最低
+也就是
+----
+buy1 = max（buy1，-prices[i]）//找出最小的入口点
+sell1 = max（sell_1,buy1+prices[i]） //找出最大的第一次交易价值
+buy2 = max(buy2,sell1-prices[i])  //找最大的剩余价值
+sell2 = max（sell2,buy2+prices[i]） //找最大的整体收益
+----
+通过这四步，循环变量一遍数据，即可得到所求
+
+=== 考察点
+贪婪，穷举
+
+=== 代码实现
+----
+class Solution {
+public:
+    int maxProfit(vector<int> &prices) {
+        int buy1 = INT_MIN,buy2 = INT_MIN,sell_1 = 0,sell_2 = 0;
+        for(int i=0;i<prices.size();i++){
+            buy1 = max(buy1,-prices[i]);
+            sell_1 = max(sell_1,buy1+prices[i]);
+            buy2 = max(buy2,sell_1-prices[i]);
+            sell_2 = max(sell_2,buy2+prices[i]);
+        }
+        return sell_2;
+    }
+};
+----

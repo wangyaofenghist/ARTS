@@ -1,0 +1,31 @@
+== best-time-to-and-sell-stock
+=== 题目描述
+----
+Say you have an array for which the i th element is the price of a given stock on day i.
+
+If you were only permitted to complete at most one transaction (ie, buy one and sell one share of the stock), design an algorithm to find the maximum profit.
+----
+=== 分析
+给定一个数组，第i个值标示第i天的股价，假设现在你可以进行一次交易，找出一个最大收益
+只能进行一次交易，肯定是最低的买，最高价买，才能获得最高利润
+
+=== 考察点
+贪婪
+
+=== 代码实现
+----
+class Solution {
+public:
+    int maxProfit(vector<int> &prices) {
+        if(prices.size() <=0 )return 0;
+        int maxNum = 0;
+        int minNum = prices[0];
+        //取得最小值，只需要 当前值减去最小值与 最大值比较得到最大值即可
+        for(int i=0;i<prices.size();i++){
+            minNum = min(minNum,prices[i]);
+            maxNum = max(maxNum,prices[i]-minNum);
+        }
+        return maxNum;
+    }
+};
+----
