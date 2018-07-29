@@ -1,0 +1,47 @@
+== pascals-triangle-ii
+=== 题目描述
+----
+Given an index k, return the k th row of the Pascal's triangle.
+
+For example, given k = 3,
+Return[1,3,3,1].
+
+Note:
+Could you optimize your algorithm to use only O(k) extra space?
+----
+
+=== 分析
+帕斯卡三角形 就是杨辉三角 ，题目要求 给出一个数 k 就返回 帕斯卡三角形第 k 行的数据。我们可以看到，杨辉三角
+第k行的值依赖于第k-1行，关系为 A[i][j] = A[i-1][j]+A[i-1][j-1] 得来，而 A[i][0] = 1 ,A[i][i+1] = 1,
+这是一个动态规划题，主要难点在于先搞清楚 杨辉三角的规则。 所以要求低k行 我们只需要初始化 一个 a[k+1] 的数组标示
+需要返回的数据，全部初始化为1，以为从低三行（i=2）的时候 才开始 应用公式所以外循环从（i=2 to k）,内循环 标示当
+前行的个数应该从 i-1 to 0 即可，i与0保持不变
+----
+    1
+   1，1
+  1，2，1
+ 1，3，3，1
+1，4，6，4，1
+……
+----
+
+=== 考察点
+动态规划，模拟
+
+=== 代码实现
+----
+class Solution {
+public:
+    vector<int> getRow(int rowIndex) {
+        //初始化数组长度为 k+1，初值为 1
+        vector<int > dp(rowIndex+1,1);
+        //从第三行开始
+        for(int i=2;i<=rowIndex;i++){
+            for(int j=i-1;j>0;j--){
+                dp[j] = dp[j]+dp[j-1];
+            }
+        }
+        return dp;
+    }
+};
+----

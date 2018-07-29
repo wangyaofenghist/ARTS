@@ -1,0 +1,69 @@
+== triangle
+=== 题目描述
+----
+Given a triangle, find the minimum path sum from top to bottom. Each step you may move to adjacent numbers on the row below.
+
+For example, given the following triangle
+
+[
+     [2],
+    [3,4],
+   [6,5,7],
+  [4,1,8,3]
+]
+
+The minimum path sum from top to bottom is11(i.e., 2 + 3 + 5 + 1 = 11).
+
+Note:
+Bonus point if you are able to do this using only O(n) extra space, where n is the total number of rows in the triangle.
+----
+=== 分析
+得到一个三角形的数据，求自顶向下的最小路径和，每一步可以选择下一行相邻的两个数字
+----
+例如，3可以选择 [6,5]中的一个5可以选择 【1，8】
+1.      [2],
+2.     [3,4],
+3.    [6,5,7],
+4.   [4,1,8,3]
+
+首先一个思路，可以自低向上求，倒数第二行的第一个数的最小路径等于 自身的值+min（倒数第一行相同位置的值，倒数第一行相同位置向后一位的值），公式可以
+推导为  A[i][j] += min(A[i+1][j],A[i+1][j+1]) ,而最终结果为 A[0][0],很典型的字底向上的动态规划。
+----
+
+=== 考察点
+动态规划
+
+=== 代码实现
+----
+class Solution {
+public:
+    int minimumTotal(vector<vector<int> > &triangle) {
+        return minimumTotal_2(triangle);
+    }
+
+    //方法二 需要额外存储空间 不会改变原有数据
+    int minimumTotal_2(vector<vector<int> > &triangle){
+        //res 数据 就是 triangle 最后一行数据
+        vector<int> res (triangle.back());
+        //行 自低向上 走，size（）-2 标示倒数第二行的下标
+        for(int i=triangle.size()-2;i>=0;i--){
+            //遍历当前行的数据
+            for(int j = 0;j < triangle[i].size();j++){
+                res[j] = triangle[i][j] + min(res[j],res[j+1]);
+            }
+
+        }
+        return res[0];
+    }
+    //方法一 不需要额外存储空间 用原有空间做动态缓存
+    int minimumTotal_1(vector<vector<int> > &triangle){
+        for(int i=triangle.size()-2;i>=0;i--){
+            for(int j = 0;j < triangle[i].size();j++){
+                triangle[i][j] += min(triangle[i+1][j],triangle[i+1][j+1]);
+            }
+
+        }
+        return triangle[0][0];
+    }
+};
+----
