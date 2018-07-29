@@ -1,0 +1,59 @@
+== binary-tree-maximum-path-sum
+=== 题目描述
+----
+Given a binary tree, find the maximum path sum.
+
+The path may start and end at any node in the tree.
+
+For example:
+Given the below binary tree,
+
+       1
+      / \
+     2   3
+
+Return6.
+----
+
+=== 分析
+给出一个二叉树，找到一个最大路径的和，路径开始和结束可以是任意一个点。
+这是一个典型的利用二叉树的题，第一感觉应该是递归，最大路径和，肯定是maxSum = max（maxSum,左子树+右子树+ val) 的形式构成
+那 left = max（0，maxPathSum（root->left,maxSum）） ,right = max(0,maxPathSum(root->right,maxSum)).也就是说
+我们先假设一个maxSum等于一个比较小的值，然后不断的对二叉树进行递归，求其左右子树的最大路径和，而maxSum 作为 求子树最大路径
+和的条件，保证如果向下递归的子树和小于maxSum 就忽略并用maxSum代替，而子树的最大值则为 max(left, right) + root->val;
+最大路径和为maxSum
+
+=== 考察点
+递归，二叉树
+
+=== 代码
+
+----
+/**
+ * Definition for binary tree
+ * struct TreeNode {
+ *     int val;
+ *     TreeNode *left;
+ *     TreeNode *right;
+ *     TreeNode(int x) : val(x), left(NULL), right(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    int maxPathSum(TreeNode *root) {
+        int maxSum = INT_MIN;
+        getMaxPathSum(root,maxSum);
+        return maxSum;
+    }
+    //递归
+    int getMaxPathSum(TreeNode *root,int &maxSum){
+        if(root==NULL)
+            return 0;
+        int left,right;
+        left = max(0,getMaxPathSum(root->left,maxSum));
+        right = max(0,getMaxPathSum(root->right,maxSum));
+        maxSum = max(maxSum, left+ right + root->val);
+        return max(left, right) + root->val;;
+    }
+};
+----
