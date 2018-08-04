@@ -1,0 +1,63 @@
+== path-sum-ii
+=== 题目描述
+----
+Given a binary tree and a sum, find all root-to-leaf paths where each path's sum equals the given sum.
+
+For example:
+Given the below binary tree andsum = 22,
+              5
+             / \
+            4   8
+           /   / \
+          11  13  4
+         /  \    / \
+        7    2  5   1
+return
+
+[
+   [5,4,11,2],
+   [5,8,4,5]
+]
+----
+=== 分析
+求出 路径和为 指定 结果 sum 路径，并将路径返回。
+给定一个 结果 sum，如果想求出 那一条 路径和等于sum，其实只需要 将 sum-root->val 后，就会变成 sum-root->val 的值 是root->left和
+root->Right 左右子树中的路径和，不停的向下缩小问题，很明显结合二叉树的规律，这是一个递归，收敛条件为 sum-root->val==0 为止，在递归
+过程中记录节点路径，由于节点路径可能为多个，求出一个后 加入到 返回结果，继续后续求解（这是一个回溯，其实递归中回溯很简单，只要参数传值即可）。
+
+=== 考察点
+递归，二叉树
+
+=== 代码实现
+
+----
+/**
+ * Definition for binary tree
+ * struct TreeNode {
+ *     int val;
+ *     TreeNode *left;
+ *     TreeNode *right;
+ *     TreeNode(int x) : val(x), left(NULL), right(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    vector<vector<int> > pathSum(TreeNode *root, int sum) {
+        vector <int > path;
+        vector <vector <int > > res;
+        pathSum(root,sum,path,res);
+        return res;
+    }
+    void pathSum(TreeNode *root,int sum,vector<int> path,vector< vector<int> > &res){
+        if(root==NULL){
+            return;
+        }
+        path.push_back(root->val);
+        if(root->left == NULL && root->right == NULL && sum - root->val ==0){
+            res.push_back(path);
+        }
+        pathSum(root->left,sum-root->val,path,res);
+        pathSum(root->right,sum- root->val,path,res);
+    }
+};
+----
