@@ -1,0 +1,50 @@
+== path-sum
+=== 题目描述
+----
+Given a binary tree and a sum, determine if the tree has a root-to-leaf path such that adding up all the values along
+the path equals the given sum.
+
+For example:
+Given the below binary tree andsum = 22,
+              5
+             / \
+            4   8
+           /   / \
+          11  13  4
+         /  \      \
+        7    2      1
+return true, as there exist a root-to-leaf path5->4->11->2which sum is 22.
+
+----
+=== 分析
+给定一个二叉树，每个节点都是一个数字，给定一个 数字 sum ，判断是否有一个路径上所有节点的和为sum，路径为从根节点到叶子节点。
+首先确认路径必须从跟节点开始，到叶子节点结束，其次确定路径上节点和的值为sum，由此我们可以对二叉树进行递归遍历，同时对每个节点进行累计计数
+但是在到达叶子节点的时候不是太好处理，需要减去刚才的叶子节点然后加上下一个叶子节点，更不容易处理的过程还是接着想上级晦朔。所以换一种思路，
+sum-root->val 后的值 要么符合 root->left 要么符合root->right 的某一个路径和，否则sum不能成立，也就等于我们用了分制的策略，我们的收敛点
+有改如何界定（何时返回、退出），到达叶子节点即可返回，此时如果 sum-root->val == 0 即为所求 否则，不符合，进行下次回溯。
+
+=== 考察点
+二叉树，遍历，分制
+
+=== 代码实现
+----
+/**
+ * Definition for binary tree
+ * struct TreeNode {
+ *     int val;
+ *     TreeNode *left;
+ *     TreeNode *right;
+ *     TreeNode(int x) : val(x), left(NULL), right(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    bool hasPathSum(TreeNode *root, int sum) {
+        if(root == NULL)
+            return false;
+        if(root->left==NULL && root->right==NULL && sum-root->val==0)
+            return true;
+        return hasPathSum(root->left,sum-root->val) || hasPathSum(root->right,sum-root->val);
+    }
+};
+----

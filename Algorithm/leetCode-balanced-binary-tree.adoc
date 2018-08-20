@@ -1,0 +1,68 @@
+== balanced binary tree
+=== 题目描述
+----
+Given a binary tree, determine if it is height-balanced.
+
+For this problem, a height-balanced binary tree is defined as a binary tree in which the depth of the two subtrees of
+every node never differ by more than 1.
+----
+
+=== 分析
+有一个二叉树，我们来判断他是否是高度平衡的（平衡二叉树），如何判断高度平衡，也就说二叉树的左右子树高度，不能超过1.
+了解了题意，我们开始分析首先我们要知道每一条路径（从根到叶）的高度，然后保证其中最大值与最小值的差值小于等于1即可，
+如此我们就需要进行深度遍历，并且记录所有路径的深度。
+另外一种思想，我们想要判断A树是不是平衡二叉树，只需要判断 |A->left(height)  - A->right(height)| <=1 即可，
+则此问题可以通过递归解决基本代码描述
+----
+bool getIsBalance（TreeNode *root,int &depth）{
+  if(root==NULL){
+    depth = 0;
+    return true;
+  }
+  int leftDepth,rightDepth;
+  bool leftBool = getIsBalance(root->left,leftDepth);
+  bool rightBool = getIsBalance(root->right,rightDepth);
+  if (leftBool && rightBool && abs(left-right)<=1){
+    depth = max(leftDepth,rightDepth)+1;
+    return true;
+  }
+  return false;
+}
+----
+
+=== 考察点
+二叉树，深度
+=== 代码
+----
+/**
+ * Definition for binary tree
+ * struct TreeNode {
+ *     int val;
+ *     TreeNode *left;
+ *     TreeNode *right;
+ *     TreeNode(int x) : val(x), left(NULL), right(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    bool isBalanced(TreeNode *root) {
+        int depth = 0;
+        return getIsBalanced(root,depth);
+    }
+    //递归的核心  &depth 标示一个深度，为后续 深度相减 判断是否差1 做准备
+    bool getIsBalanced(TreeNode *root,int &depth){
+        if(root == NULL){
+            depth = 0;
+            return true;
+        }
+        int leftDepth ,rightDepth;
+        bool leftBool = getIsBalanced(root->left,leftDepth);
+        bool rightBool = getIsBalanced(root->right,rightDepth);
+        if(leftBool && rightBool && abs(leftDepth-rightDepth)<=1){
+            depth = max(leftDepth,rightDepth)+1;
+            return true;
+        }
+        return false;
+    }
+};
+----
