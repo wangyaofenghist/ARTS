@@ -1,0 +1,97 @@
+== docker 打包一个golang 程序
+
+=== 常用的docker 命令
+1. docker images            //查看已有镜像
+2. docker search ‘关键词’    //搜索镜像
+3. docker pull ‘关键词’      //获取镜像
+4. docker exec -it 'containerId'  /bin/bash    #打开新的sh进入docker 容器
+5. docker commit
+   docker commit -m "备注 " -a "userName" ‘containerId’ ‘name：tag’
+    例如： docker commit -m "ubuntu with vim " -a "wyf" 6b97d9c0fa99 wyf/ubuntu:vim
+    将容器保存为镜像
+6. docker ps    //查看现有 容器  docker ps -a
+7. docker rm /rmi "containerId/imagesId"  //移除容器或对象
+8. docker run    //运行一个镜像
+   例如：
+   docker run -it ubuntu /bin/bash
+   docker run zzz -p 8800：8800 -it /bin/bash
+9. docker attach  “containerId”    //重新进入容器
+10. docker stop/start/restart “containerId”   //停止，启动，重启 容器
+11. docker build                              //构建一个 镜像
+12. Ctrl+P+Q  //退出但不关闭 容器
+
+=== 理解镜像与容器
+
+了解过虚拟机的都知道，虚拟机是在物理机上安装虚拟机软件（virtualbox 等），然后通过安装操作系统而形成的。准确来说安装操作系统的过程就是把系统镜像文件进行解压安装的过程，而一旦安装完成之后，就可以独立形成一个操作系统，完成各种对应操作系统支持的功能。
+类似的，docker 里面的镜像可理解为操作系统的镜像，但是并不是完全的操作系统，因为docker 并不会想虚拟机一样进行一个操作系统的构建，它只会提供一个环境，类似于安装linux 的时候，可以先进去体验一把什么是linux的东东。所以运行的镜像docker 称为容器，而不是虚拟机，既然是容器，docker 提供的只是一个容纳你想要东西的一个个东西，一旦关闭或者退出，并不会进行保存。这是容器和镜像。
+
+=== 将一个golang程序用docker 进行打包
+1. 下载相应的golang 镜像
+----
+localhost:test wyf$ docker search golang
+NAME                                 DESCRIPTION                                     STARS               OFFICIAL            AUTOMATED
+golang                               Go (golang) is a general purpose, higher-lev…   2078                [OK]
+ilanyu/golang-reverseproxy           golang-ReverseProxy                             47                                      [OK]
+desertbit/golang-gb                  Golang GB Docker Image                          3                                       [OK]
+resin/artik710-golang                Go (golang) is a general purpose, imperative…   2
+instructure/golang                   Instructure base golang image                   2                                       [OK]
+webhippie/golang                     Docker images for golang                        1                                       [OK]
+resin/raspberrypi3-golang            Go (golang) is a general purpose, imperative…   0
+resin/artik5-golang                  Go (golang) is a general purpose, imperative…   0
+resin/artik10-alpine-golang          Go (golang) is a general purpose, imperative…   0
+...
+
+localhost:test wyf$ docker pull golang
+...
+localhost:test wyf$ docker images
+REPOSITORY           TAG                 IMAGE ID            CREATED             SIZE
+golang               latest              d0e7a411e3da        4 weeks ago         794MB
+
+----
+
+2. 首先进入到需要用docker 运行的 golang 程序根目录，添加 Dockerfile 文件
+----
+  1 FROM golang
+  2 MAINTAINER FAE Config Server "****@***.com"
+  3 WORKDIR $GOPATH/src/git.xxxx.com/yyy/zzz
+  4 ADD . $GOPATH/src/git.xxxx.com/yyy/zzz
+  5 RUN go build .
+  6 EXPOSE 8800
+  7 ENTRYPOINT ["./zzz"]
+----
+3. 执行：docker build -t . zzz 构建镜像
+通过：docker images 进行查看
+----
+localhost:test wyf$ docker images
+REPOSITORY           TAG                 IMAGE ID            CREATED             SIZE
+zzz                  latest              2bcd1d0369b6        4 hours ago         1.01GB
+golang               latest              d0e7a411e3da        4 weeks ago         794MB
+----
+4. 运行镜像：docker run zzz -p 8800:8800 -it /bin/bash --rm
+查看正在运行的容器：docker ps
+----
+localhost:zzz wyf$ docker ps
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+59a5fdb91f01        zzz                 "./zzz /bin/sh"     4 hours ago         Up 4 hours          8800/tcp            jolly_swirles
+----
+
+=== dockerfile
+----
+Command	Description
+ADD	Copies a file from the host system onto the container   复制一个文件从 host 主机到 容器中
+CMD	The command that runs when the container starts         运行一个命令，当容器启动的时候
+ENTRYPOINT
+与cmd 类似 往往用于设置容器启动后的第一个命令，这对一个容器来说往往是固定的 CMD指令，往往用于设置容器启动的第一个命令的默认参数，这对一个容器来说可以是变化的  ，docker run <command>往往用于给出替换CMD的临时参数。 JSON风格["command","arg1"]。
+ENV	Sets an environment variable in the new container       设置一个环境 变量值在容器中
+EXPOSE	Opens a port for linked containers                  在容器中开启一个端口
+FROM	The base image to use in the build. This is mandatory and must be the first command in the file.
+必须出现在文件的第一行，标示使用的基础镜像
+MAINTAINER	An optional value for the maintainer of the script
+一个可选值，添加一些命令维护信息
+ONBUILD	A command that is triggered when the image in the Dcokerfile is used as a base for another image
+RUN	Executes a command and save the result as a new layer
+USER	Sets the default user within the container
+VOLUME	Creates a shared volume that can be shared among containers or by the host machine
+WORKDIR	Set the default working directory for the container
+----
+link/link:http://odewahn.github.io/docker-jumpstart/building-images-with-dockerfiles.html[DockerFile]
