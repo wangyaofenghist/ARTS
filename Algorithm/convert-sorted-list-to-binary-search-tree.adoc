@@ -1,0 +1,72 @@
+== convert-sorted-list-to-binary-search-tree
+=== 题目描述
+----
+Given a singly linked list where elements are sorted in ascending order,
+convert it to a height balanced BST.
+----
+=== 分析
+讲一个升序排列的单项链表，转换为一个搜索二叉树。单项链表，而且是有序的，
+如：
+----
+1->2->3->4->5->6->7->8->9
+搜索二叉树：
+      5
+    2   7
+  1  3  6  8
+      4      9
+----
+如何转换，首先了解什么是二叉搜索树的，也就是左子树必须比根节点小，右子树必须必根节点大。因此我们如果吧有序链表转换为二叉搜索树，首先要找到链表
+的中点，也就是说，以中点为根节点，将链表分割为左右两部分，左边为左子树，右边为右子树，不停递归即可得到结果。找到单链表的中点，可以通过快慢指针
+得到：
+while(fast!=tail && fast->next != tail ){
+  fast = fast->next->next;
+  slow = slow->next->next;
+}
+
+=== 考察点
+搜索二叉树，快慢指针
+=== 代码实现
+----
+/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     ListNode *next;
+ *     ListNode(int x) : val(x), next(NULL) {}
+ * };
+ */
+/**
+ * Definition for binary tree
+ * struct TreeNode {
+ *     int val;
+ *     TreeNode *left;
+ *     TreeNode *right;
+ *     TreeNode(int x) : val(x), left(NULL), right(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    TreeNode *sortedListToBST(ListNode *head) {
+        return getBst(head,NULL);
+    }
+    TreeNode *getBst(ListNode *head,ListNode *tail){
+        //收敛条件，标示已经走完
+        if(head == tail)
+            return NULL;
+        //定义fast，slow 并将起点设置为相同
+        ListNode *fast,*slow;
+        fast = head;
+        slow = head;
+        //快慢指针找到中点
+        while(fast != tail && fast->next != tail){
+            fast = fast->next->next;
+            slow = slow ->next;
+        }
+        //构造二叉树
+        TreeNode *root = new TreeNode(slow->val);
+        root->left = getBst(head,slow);
+        root->right = getBst(slow->next,tail);
+        return root;
+    }
+};
+----

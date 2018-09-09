@@ -1,0 +1,42 @@
+== convert-sorted-array-to-binary-search-tree
+=== 题目描述
+----
+Given an array where elements are sorted in ascending order,
+convert it to a height balanced BST.
+----
+=== 分析
+相比较将升序排列的单项链表转换为bst（二叉搜索树），此题将升序排列的数组转换为bst 更简单一些，
+因为可以直接计算出来，中间数的下标，并取到作为根节点，向左作为左子树，向右作为右子树，递归直
+到完成。
+
+=== 考察点
+二叉搜索树
+
+=== 代码
+----
+/**
+ * Definition for binary tree
+ * struct TreeNode {
+ *     int val;
+ *     TreeNode *left;
+ *     TreeNode *right;
+ *     TreeNode(int x) : val(x), left(NULL), right(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    TreeNode *sortedArrayToBST(vector<int> &num) {
+        return toBST(num,0,num.size());
+    }
+    TreeNode *toBST(vector<int> &num,int start,int end){
+         if(start >= end || num.size()<=0)
+             return NULL;
+        //右移 即代表 /2  mid 为中点的下标，如果是链表此处应该通过快慢指针找到中点
+        int mid = (start+end)>>1;
+        TreeNode *root = new TreeNode(num[mid]);
+        root->left = toBST(num,start,mid);
+        root->right = toBST(num,mid+1,end);
+        return root;
+    }
+};
+----
