@@ -1,0 +1,77 @@
+== binary-tree-level-order-traversal-ii
+=== 题目描述
+----
+Given a binary tree, return the bottom-up level order traversal of its nodes' values. (ie, from left to right, level by level from leaf to root).
+
+For example:
+Given binary tree{3,9,20,#,#,15,7},
+
+    3
+   / \
+  9  20
+    /  \
+   15   7
+
+return its bottom-up level order traversal as:
+
+[
+  [15,7]
+  [9,20],
+  [3],
+]
+
+confused what"{1,#,2,3}"means? > read more on how binary tree is serialized on OJ.
+
+
+OJ's Binary Tree Serialization:
+The serialization of a binary tree follows a level order traversal, where '#' signifies a path terminator where no
+----
+=== 分析
+给定一个二叉树，层级遍历【自下而上，自左到右的顺序】。首先确定这是一个二叉树的层级遍历，但是与层级遍历不同的是，层级遍历是自上而下，自左到右的顺序，此处强调了自下而上。
+层级遍历，肯定要用到队列，只是将结果原样输出就是自上而下，倒序输出就是自下而上，同样也可以对结果进行反转例如：
+[
+  [15,7],
+  [9,20],
+  [3],
+]
+=>
+[
+  [3],
+  [9,20],
+  [15,7]
+]
+=== 考察点
+二叉树层级遍历，栈
+
+=== 代码实现
+----
+class Solution{
+  public:
+    vector<vector<int> >levelOrderBottom(TreeNode *root){
+      vector<vector<int>> res;
+      if(root == NULL){
+        return res;
+      }
+      queue <TreeNode *> q;
+      q.push(root);
+      TreeNode *tmp;
+      while(q.size>0){
+        vector <int> level;
+        //此处n=q.size(); 在整个for 循环中只会执行1次，所以可以提出来
+        for(int i=0,n=q.size;i<n;i++){
+          //从队列中取出数据
+          tmp = q.front();
+          q.pop();
+          level.push_back(tmp->val);
+          if(tmp->left) q.push(tmp->left);
+          if(tmp->right) q.push(tmp->right);
+        }
+        //将每一层的数据，写入返回结果
+        res.push_back(level);
+      }
+      //反转函数
+      reverse(res.begin(),res.end());
+      return res;
+    }
+}
+----
