@@ -357,4 +357,413 @@ prompt>
 ----
 http://cn.php.net/manual/zh/internals2.opcodes.php[php手册提供的opcode]
 
-=== 了解 opcache ==
+=== 了解 opcache ===
+opcache 在php底层同样是以 扩展的形式出现的，我们看一下目录结构。
+
+image::../img/WX20180911-190745@2x.png[]
+
+
+先从上到下开始分析：
+
+shared_alloc_mmap.c,shared_alloc_posix.c ,shared_alloc_shm.c,shared_alloc_win32.c 均实现了
+
+----
+static  int create_segments()
+static  int detach_segment()
+static  size_t segment_type_size()
+
+----
+三个函数，只是 **win32.c 本身是为window系统准备实现相对稍微复杂，但总体来说是抽象出了一层segments并对齐进行创建（分配）、注销、 获得segment类型的大小等几个函数。而很明显 mmap 是linux的一种共享方式，可以把文件映射到内存，从而加速文件的读取，减少系统开销 ，shm 也是共享内存的一种方式，linux 通过[shmget、shmat、shmdt、shmctl]函数提供支持,posix 共享内存是 要区别于 system v 共享内存 linux 提供【shm_open()、shm_unlink() ..】 等支持。我们暂且认为是一个新旧版本的不同。
+
+与共享内存相关的文件还有 zend_shared_alloc.h ,zend_shared_alloc.c  两个文件，
+
+zend_shared_alloc.c
+----
+...
+static const zend_shared_memory_handler_entry handler_table[] = {
+#ifdef USE_MMAP
+	{ "mmap", &zend_alloc_mmap_handlers },
+#endif
+#ifdef USE_SHM
+	{ "shm", &zend_alloc_shm_handlers },
+#endif
+#ifdef USE_SHM_OPEN
+	{ "posix", &zend_alloc_posix_handlers },
+#endif
+#ifdef ZEND_WIN32
+	{ "win32", &zend_alloc_win32_handlers },
+#endif
+	{ NULL, NULL}
+...
+----
+shared_alloc_mmap.c
+----
+...
+zend_shared_memory_handlers zend_alloc_mmap_handlers = {
+	create_segments,
+	detach_segment,
+	segment_type_size
+};
+...
+----
+shared_alloc_posix.c
+----
+...
+zend_shared_memory_handlers zend_alloc_posix_handlers = {
+	(create_segments_t)create_segments,
+	(detach_segment_t)detach_segment,
+	segment_type_size
+};
+...
+----
+shared_alloc_shm.c
+----
+...
+zend_shared_memory_handlers zend_alloc_shm_handlers = {
+	(create_segments_t)create_segments,
+	(detach_segment_t)detach_segment,
+	segment_type_size
+};
+
+...
+----
+shared_alloc_posix.c
+----
+...
+zend_shared_memory_handlers zend_alloc_win32_handlers = {
+	create_segments,
+	detach_segment,
+	segment_type_size
+};
+...
+----
+一个C语言下的简单工厂就实现了，而在 zend_shared_alloc.h中，我们可以清楚的看到，更清晰的逻辑以及一些基础数据结构定义。
+
+至此，我们不能再从上而下分析了，但是我们可大概定位一些动
+zend_accelerator_debug  大致看一眼，是一些相关错误级别，错误输出函数的定义。根据之前的知识，我们直接找到opcache扩展的 zend_module_entry，zend_function_entry 找到对外提供的函数以及模块启动过程中的加载与注销。
+
+zend_accelerator_module.c
+
+----
+static zend_function_entry accel_functions[] = {
+	/* User functions */
+	ZEND_FE(opcache_reset,					arginfo_opcache_none)
+	ZEND_FE(opcache_invalidate,				arginfo_opcache_invalidate)
+	ZEND_FE(opcache_compile_file,			arginfo_opcache_compile_file)
+	ZEND_FE(opcache_is_script_cached,		arginfo_opcache_is_script_cached)
+	/* Private functions */
+	ZEND_FE(opcache_get_configuration,		arginfo_opcache_none)
+	ZEND_FE(opcache_get_status,				arginfo_opcache_get_status)
+	ZEND_FE_END
+};
+
+static zend_module_entry accel_module_entry = {
+	STANDARD_MODULE_HEADER,
+	ACCELERATOR_PRODUCT_NAME,
+	accel_functions,
+	ZEND_MINIT(zend_accelerator),
+	ZEND_MSHUTDOWN(zend_accelerator),
+	NULL,
+	NULL,
+	zend_accel_info,
+	PHP_VERSION,
+	NO_MODULE_GLOBALS,
+	accel_post_deactivate,
+	STANDARD_MODULE_PROPERTIES_EX
+};
+----
+从代码中可知，opcache 对外提供了六个函数  【opcache_reset,opcache_invalidate,opcache_compile_file,opcache_is_script_cached】 +
+【opcache_get_configuration，opcache_get_status】 +
+模块启动的时候执行
+
+ZEND_MINIT(zend_accelerator),
+
+模块结束的时候执行
+
+ZEND_MSHUTDOWN(zend_accelerator),
+
+通过zend_accel_info 返回 phpinfo() 中的信息
+
+
+====  opcache_compile_file ====
+----
+static ZEND_FUNCTION(opcache_compile_file)
+{
+	char *script_name;
+	size_t script_name_len;
+	zend_file_handle handle;
+	zend_op_array *op_array = NULL;
+	zend_execute_data *orig_execute_data = NULL;
+  //接受一个string 参数
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "s", &script_name, &script_name_len) == FAILURE) {
+		return;
+	}
+  //进行一系列判断
+	if (!ZCG(enabled) || !accel_startup_ok || !ZCSG(accelerator_enabled)) {
+		zend_error(E_NOTICE, ACCELERATOR_PRODUCT_NAME " seems to be disabled, can't compile file");
+		RETURN_FALSE;
+	}
+  //构造参数
+	handle.filename = script_name;
+	handle.free_filename = 0;
+	handle.opened_path = NULL;
+	handle.type = ZEND_HANDLE_FILENAME;
+
+	orig_execute_data = EG(current_execute_data);
+
+	zend_try {
+    //生成opcode 放入 op_array 中
+		op_array = persistent_compile_file(&handle, ZEND_INCLUDE);
+	} zend_catch {
+		EG(current_execute_data) = orig_execute_data;
+		zend_error(E_WARNING, ACCELERATOR_PRODUCT_NAME " could not compile file %s", handle.filename);
+	} zend_end_try();
+  //oparray 不为空，注销释放相关参数
+	if(op_array != NULL) {
+		destroy_op_array(op_array);
+		efree(op_array);
+		RETVAL_TRUE;
+	} else {
+		RETVAL_FALSE;
+	}
+	zend_destroy_file_handle(&handle);
+}
+
+----
+persistent_compile_file 函数，重点部分
+----
+/* If script was not found or invalidated by validate_timestamps */
+	if (!persistent_script) {
+		uint32_t old_const_num = zend_hash_next_free_element(EG(zend_constants));
+		zend_op_array *op_array;
+
+	....
+
+		/* Try and cache the script and assume that it is returned from_shared_memory.
+         * If it isn't compile_and_cache_file() changes the flag to 0
+         */
+       	from_shared_memory = 0;
+		persistent_script = opcache_compile_file(file_handle, type, key, &op_array);
+		if (persistent_script) {
+			persistent_script = cache_script_in_shared_memory(persistent_script, key, key ? key_length : 0, &from_shared_memory);
+		}
+
+		/* Caching is disabled, returning op_array;
+		 * or something went wrong during compilation, returning NULL
+		 */
+		if (!persistent_script) {
+			SHM_PROTECT();
+			HANDLE_UNBLOCK_INTERRUPTIONS();
+			return op_array;
+		}
+		....
+
+	return zend_accel_load_script(persistent_script, from_shared_memory);
+}
+----
+opcache_compile_file
+----
+zend_try {
+		orig_compiler_options = CG(compiler_options);
+		CG(compiler_options) |= ZEND_COMPILE_HANDLE_OP_ARRAY;
+		CG(compiler_options) |= ZEND_COMPILE_IGNORE_INTERNAL_CLASSES;
+		CG(compiler_options) |= ZEND_COMPILE_DELAYED_BINDING;
+		CG(compiler_options) |= ZEND_COMPILE_NO_CONSTANT_SUBSTITUTION;
+		op_array = *op_array_p = accelerator_orig_compile_file(file_handle, type);
+		CG(compiler_options) = orig_compiler_options;
+	} zend_catch {
+		op_array = NULL;
+		do_bailout = 1;
+		CG(compiler_options) = orig_compiler_options;
+	} zend_end_try();
+
+----
+----
+static int accel_startup(zend_extension *extension){
+  ...
+
+  accelerator_orig_compile_file = zend_compile_file;
+	zend_compile_file = persistent_compile_file;
+  ...
+}
+//Zend/zend.c
+int zend_startup(zend_utility_functions *utility_functions, char **extensions) /* {{{ */
+{
+  ...
+	zend_compile_file = compile_file;
+  ...
+}
+----
+最后我们在 zend_compile.h 中找到了定义  但是实现是在 zend_language_scanner.l 中
+----
+/* helper functions in zend_language_scanner.l */
+ZEND_API zend_op_array *compile_file(zend_file_handle *file_handle, int type);
+...
+----
+
+zend_language_scanner.l
+----
+ZEND_API zend_op_array *compile_file(zend_file_handle *file_handle, int type)
+{
+	zend_lex_state original_lex_state;
+	zend_op_array *op_array = NULL;
+	zend_save_lexical_state(&original_lex_state);
+
+	if (open_file_for_scanning(file_handle)==FAILURE) {
+		if (type==ZEND_REQUIRE) {
+			zend_message_dispatcher(ZMSG_FAILED_REQUIRE_FOPEN, file_handle->filename);
+			zend_bailout();
+		} else {
+			zend_message_dispatcher(ZMSG_FAILED_INCLUDE_FOPEN, file_handle->filename);
+		}
+	} else {
+		op_array = zend_compile(ZEND_USER_FUNCTION);
+	}
+
+	zend_restore_lexical_state(&original_lex_state);
+	return op_array;
+}
+
+ZEND_API int open_file_for_scanning(zend_file_handle *file_handle)
+{
+	char *buf;
+	size_t size, offset = 0;
+	zend_string *compiled_filename;
+
+	/* The shebang line was read, get the current position to obtain the buffer start */
+	if (CG(start_lineno) == 2 && file_handle->type == ZEND_HANDLE_FP && file_handle->handle.fp) {
+		if ((offset = ftell(file_handle->handle.fp)) == (size_t)-1) {
+			offset = 0;
+		}
+	}
+
+	if (zend_stream_fixup(file_handle, &buf, &size) == FAILURE) {
+		return FAILURE;
+	}
+
+	zend_llist_add_element(&CG(open_files), file_handle);
+	if (file_handle->handle.stream.handle >= (void*)file_handle && file_handle->handle.stream.handle <= (void*)(file_handle+1)) {
+		zend_file_handle *fh = (zend_file_handle*)zend_llist_get_last(&CG(open_files));
+		size_t diff = (char*)file_handle->handle.stream.handle - (char*)file_handle;
+		fh->handle.stream.handle = (void*)(((char*)fh) + diff);
+		file_handle->handle.stream.handle = fh->handle.stream.handle;
+	}
+
+	/* Reset the scanner for scanning the new file */
+	SCNG(yy_in) = file_handle;
+	SCNG(yy_start) = NULL;
+
+	if (size != (size_t)-1) {
+		if (CG(multibyte)) {
+			SCNG(script_org) = (unsigned char*)buf;
+			SCNG(script_org_size) = size;
+			SCNG(script_filtered) = NULL;
+
+			zend_multibyte_set_filter(NULL);
+
+			if (SCNG(input_filter)) {
+				if ((size_t)-1 == SCNG(input_filter)(&SCNG(script_filtered), &SCNG(script_filtered_size), SCNG(script_org), SCNG(script_org_size))) {
+					zend_error_noreturn(E_COMPILE_ERROR, "Could not convert the script from the detected "
+							"encoding \"%s\" to a compatible encoding", zend_multibyte_get_encoding_name(LANG_SCNG(script_encoding)));
+				}
+				buf = (char*)SCNG(script_filtered);
+				size = SCNG(script_filtered_size);
+			}
+		}
+		SCNG(yy_start) = (unsigned char *)buf - offset;
+		yy_scan_buffer(buf, (unsigned int)size);
+	} else {
+		zend_error_noreturn(E_COMPILE_ERROR, "zend_stream_mmap() failed");
+	}
+
+	BEGIN(INITIAL);
+
+	if (file_handle->opened_path) {
+		compiled_filename = zend_string_copy(file_handle->opened_path);
+	} else {
+		compiled_filename = zend_string_init(file_handle->filename, strlen(file_handle->filename), 0);
+	}
+
+	zend_set_compiled_filename(compiled_filename);
+	zend_string_release(compiled_filename);
+
+	if (CG(start_lineno)) {
+		CG(zend_lineno) = CG(start_lineno);
+		CG(start_lineno) = 0;
+	} else {
+		CG(zend_lineno) = 1;
+	}
+
+	RESET_DOC_COMMENT();
+	CG(increment_lineno) = 0;
+	return SUCCESS;
+}
+----
+至此，我们基本熟悉了一个php文件如何变成opcode 进而被opcache缓存起来，现在我们来考虑一个问题，opcache 应该以一个什么样的结构存储这些opcode呢？
+
+内存结构
+
+----
+typedef struct _zend_shared_segment {
+    size_t  size;
+    size_t  pos;  /* position for simple stack allocator */
+    void   *p;
+} zend_shared_segment;
+
+typedef struct _zend_shared_memory_state {
+	int *positions;   /* current positions for each segment */
+	size_t shared_free; /* amount of free shared memory */
+} zend_shared_memory_state
+
+typedef struct _zend_smm_shared_globals {
+    /* Shared Memory Manager */
+    zend_shared_segment      **shared_segments;
+    /* Number of allocated shared segments */
+    int                        shared_segments_count;
+    /* Amount of free shared memory */
+    size_t                     shared_free;
+    /* Amount of shared memory allocated by garbage */
+    size_t                     wasted_shared_memory;
+    /* No more shared memory flag */
+    zend_bool                  memory_exhausted;
+    /* Saved Shared Allocator State */
+    zend_shared_memory_state   shared_memory_state;
+	/* Pointer to the application's shared data structures */
+	void                      *app_shared_globals;
+} zend_smm_shared_globals;
+----
+
+数据结构
+
+----
+struct _zend_accel_hash_entry {
+	zend_ulong             hash_value;
+	char                  *key;
+	uint32_t              key_length;
+	zend_accel_hash_entry *next;
+	void                  *data;
+	zend_bool              indirect;
+};
+
+typedef struct _zend_accel_hash {
+	zend_accel_hash_entry **hash_table;
+	zend_accel_hash_entry  *hash_entries;
+	uint32_t               num_entries;
+	uint32_t               max_num_entries;
+	uint32_t               num_direct_entries;
+} zend_accel_hash;
+
+typedef struct _zend_blacklist_entry {
+    char *path;
+    int   path_length;
+	int   id;
+} zend_blacklist_entry;
+
+typedef struct _zend_blacklist {
+	zend_blacklist_entry *entries;
+	int                   size;
+	int                   pos;
+	zend_regexp_list     *regexp_list;
+} zend_blacklist;
+
+----
