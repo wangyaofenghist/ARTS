@@ -1,0 +1,360 @@
+== php opache ==
+. PHP底层基础
+. PHP扩展
+. 了解 opcode
+. 了解 opcache
+
+
+=== php底层基础 ===
+php 是一门弱类型语言，也称解释型语言，底层由c语言实现。基于一门语言构造出另外一门语言本身就是一个语法规则，词法规则的实现，而php
+底层源码会充斥着大量的一层二层三层指针，以及各种define 定义，php底层通过已经成型的lex来做词法分析，进行完词法、语法分析后会生成opcode，也就是php的中间代码，最终zend引擎执行的也是opcode。
+我们来看一下php7的源码目录结构
+----
+bogon:php-7.2.3 didi$  ls -l | grep ^d
+drwxr-xr-x@  22 didi  admin      748  2 28  2018 TSRM
+drwxr-xr-x@ 146 didi  admin     4964  2 28  2018 Zend
+drwxr-xr-x@   6 didi  admin      204  2 28  2018 appveyor
+drwxr-xr-x@  14 didi  admin      476  2 28  2018 build
+drwxr-xr-x@  78 didi  admin     2652  2 28  2018 ext
+drwxr-xr-x@  56 didi  admin     1904  2 28  2018 main
+drwxr-xr-x@   6 didi  admin      204  2 28  2018 pear
+drwxr-xr-x@  10 didi  admin      340  2 28  2018 sapi
+drwxr-xr-x@   8 didi  admin      272  2 28  2018 scripts
+drwxr-xr-x@  11 didi  admin      374  2 28  2018 tests
+drwxr-xr-x@   4 didi  admin      136  2 28  2018 travis
+drwxr-xr-x@  59 didi  admin     2006  2 28  2018 win32
+bogon:php-7.2.3 didi$
+----
+* ext 官方扩展目录，包含了绝大多数php的函数定义与实现，pdo，array，mysql 等都是以扩展方式实现。
+* zend zend引擎，php脚本的词法语法解析，opcache 的执行以及扩展机制的加载等。
+* main 这里是php最为核心的文件，主要实现php的基本设施，这里和zend 引擎不同，zend 主要实现语言最核心的的语言环境，语法词法解析、opcache执行，php扩展机制的加载，等等 而main 中实现的则更多为，php扩展中或者sapi 中甚至zend引擎中需要用到的基础函数。
+sapi 包含了各种php对外服务的抽象层，如CGI，fastcgi，php—fpm，等均在此处。
+  例如在sapi/fpm/fpm/fpm_main.c （很多地方都在用）中用到的 php_request_startup() 定义在 main/php_main.h 并在 main/main.c 中实现。将 zend 中的 zend_spprintf（）函数 重定义为 spprintf，并在各种扩展中使用,zend目录中的源码则还使用zend_spprintf.
+----
+#define spprintf zend_spprintf   // 文件位置 ：main/spprintf.h
+
+//函数声明  Zend/zend.h
+ZEND_API size_t zend_spprintf(char **message, size_t max_len, const char *format, ...)  ZEND_ATTRIBUTE_FORMAT(printf, 3, 4);
+
+// 函数实现  Zend/zend.c
+
+ZEND_API size_t zend_spprintf(char **message, size_t max_len, const char *format, ...) /* {{{ */
+{
+	va_list arg;
+	size_t len;
+
+	va_start(arg, format);
+	len = zend_vspprintf(message, max_len, format, arg);
+	va_end(arg);
+	return len;
+}
+----
+* TSRM php 分为线程安全与飞线程安全，很多底层代码，线程安全是需要带上 TSRM 标志的，
+* pear "php7扩展与应该仓库”，包含PEAR 的核心文件。
+
+了解了以上PHP底层源码的基本目录结构，其实我们可以大概总结一下，我们所用的php 其实是基于一段zend 引擎可以解析的脚本，可以认为是虚拟机，而php里面众多的函数或类以扩展库的方式存在也就是ext目录，而php通过sapi 对外提供服务，也就是不管通过 php  aa.php  执行一段php脚本，还是通过url 访问一个页面，最终到php层面，都是通过 sapi 层开始，只是命令行用的是cli，nginx 用的是 fpm，apache 用的是mod_php 将脚本信息发送给 zend ，然后zend 通过 调用词法语法分析，产生opcache 并执行，后将结果返回给最终的调用方（sapi）。其实sapi就是php与各个服务器抽象层直接所遵守的相同的约定。
+
+php 架构图 ：
+
+image::../img/WX20180911-130706@2x.png[]
+
+
+这里可以看一下 sapi 的生命周期：
+无论我们用 cli 在命令行下执行，还是 fpm 用在nginx下，对于每种情况下都需要 依次进行Module init、Request init、Request Shutdown、Module shutdown四个过程 ，Minit MshutDown 分别 标示在PHP启动时模块加载阶段以及模块关闭阶段，Rinit Rshutdown 是每次请求都会进行触发。
+
+cli/cgi 单进程下的执行流程:
+
+image::../img/02-01-01-cgi-lift-cycle.png[]
+
+基于此，cli 模式下 每次执行php 都需要进行 MInit，RInit，rShutDown，MshutDown这四个阶段，但是在web 模式下 其实 Minit 与 MshutDown 是没有必要每次都启动的，只需要启动一次即可。所以基于此就有了php-fpm ，遵循fastcgi 模式，多进程模式进行管理php。
+----
+          MINIT
+              RINIT
+              RSHUTDOWN
+          MshutDown
+
+fpm             ...
+
+          MINIT
+            RINIT
+            RSHUTDOWN
+          MshutDown
+          ...
+----
+
+也就是 fpm 维护了这么一个进程池，master 管理多个 worker ，每个worker 在都已经运行了MINIT 当一个web 请求发送过来后，通过fastcgi协议，将具体需要执行的代码发送给fpm，fpm 将其转发到 一个worker 中进行执行，并将执行结果返回。此处与nginx 的模式还不一样，最大的区别在于每一个phpfpm进程只能处理一个请求，请求结束，才能开始处理下一个。而nginx 采用的虽然也是master - worker 多进程 模式，但是不同点在于nginx采用的高级IO 通过 epoll 、poll、select等机制进行处理，不需要等某一次请求完全结束才执行下次请求，所以并发能力是没法比较的。
+
+
+=== php 扩展 ===
+
+了解完php 的相关的整体架构，我们开始看一下php扩展。php 扩展只是从php底层架构层面来说，对应应用层其实是无感知的，无论你用array去构建一个数组，还是调用pdo 去连接mysql 都是扩展实现，而与zend 和 sapi 无关，而在次过程中，php业务层是无需关注的。
+
+php7.2.3 ext 目录扩展
+----
+localhost:ext didi$ ls
+bcmath			exif			iconv			oci8			pdo_oci			reflection		sqlite3			xmlrpc
+bz2			ext_skel		imap			odbc			pdo_odbc		session			standard		xmlwriter
+calendar		ext_skel_win32.php	interbase		opcache			pdo_pgsql		shmop			sysvmsg			xsl
+com_dotnet		fileinfo		intl			openssl			pdo_sqlite		simplexml		sysvsem			zend_test
+ctype			filter			json			pcntl			pgsql			skeleton		sysvshm			zip
+curl			ftp			ldap			pcre			phar			snmp			tidy			zlib
+date			gd			libxml			pdo			posix			soap			tokenizer
+dba			gettext			mbstring		pdo_dblib		pspell			sockets			wddx
+dom			gmp			mysqli			pdo_firebird		readline		sodium			xml
+enchant			hash			mysqlnd			pdo_mysql		recode			spl			xmlreader
+----
+
+首先咱们根据的理解，对应每一个扩展也应该有 MINIT ，RINIT，RShutDown，MShutDown 这四个过程，否则zend而是无法加载的。 +
+
+. PHP_FUNCTION()            //注册一个PHP 函数
+----
+//等同于 PHP_FUNCTION
+static ZEND_FUNCTION(opcache_is_script_cached)
+{
+	zend_string *script_name;
+	if (!validate_api_restriction()) {
+		RETURN_FALSE;
+	}
+	if (!ZCG(enabled) || !accel_startup_ok || !ZCSG(accelerator_enabled)) {
+		RETURN_FALSE;
+	}
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "S", &script_name) == FAILURE) {
+		return;
+	}
+	RETURN_BOOL(filename_is_in_cache(script_name));
+}
+----
+. zend_function_entry       //定义模块对应对应的function 列表
+----
+static zend_function_entry accel_functions[] = {
+	/* User functions */
+	ZEND_FE(opcache_reset,					arginfo_opcache_none)
+	ZEND_FE(opcache_invalidate,				arginfo_opcache_invalidate)
+	ZEND_FE(opcache_compile_file,			arginfo_opcache_compile_file)
+	ZEND_FE(opcache_is_script_cached,		arginfo_opcache_is_script_cached)
+	/* Private functions */
+	ZEND_FE(opcache_get_configuration,		arginfo_opcache_none)
+	ZEND_FE(opcache_get_status,				arginfo_opcache_get_status)
+	ZEND_FE_END
+};
+----
+
+. zend_module_entry         //定义整个模块的信息
+----
+static zend_module_entry accel_module_entry = {
+	STANDARD_MODULE_HEADER,
+	ACCELERATOR_PRODUCT_NAME,
+	accel_functions,
+	ZEND_MINIT(zend_accelerator),
+	ZEND_MSHUTDOWN(zend_accelerator),
+	NULL,
+	NULL,
+	zend_accel_info,
+	PHP_VERSION,
+	NO_MODULE_GLOBALS,
+	accel_post_deactivate,
+	STANDARD_MODULE_PROPERTIES_EX
+};
+----
+----
+struct _zend_module_entry {
+    unsigned short size;
+    unsigned int zend_api;
+    unsigned char zend_debug;
+    unsigned char zts;
+    char *name;
+    zend_function_entry *functions;
+    int (*module_startup_func)(INIT_FUNC_ARGS);
+    int (*module_shutdown_func)(SHUTDOWN_FUNC_ARGS);
+    int (*request_startup_func)(INIT_FUNC_ARGS);
+    int (*request_shutdown_func)(SHUTDOWN_FUNC_ARGS);
+    void (*info_func)(ZEND_MODULE_INFO_FUNC_ARGS);
+    char *version;
+    [more]
+};
+----
+|===
+|参数|描述|
+|size, zend_api, zend_debug and zts|通常使用STANDARD_MODULE_HEADER来填充|
+|name|扩展名|
+|functions | 指向zend_functions_entry指针 |
+|module_startup_func,
+module_shutdown_func,
+request_startup_func,
+request_shutdown_func | 分别对应模块启动，关闭，请求到达，结束 四个过程中对应的执行函数，一般会在此过程中进行一些初始化，释放等信息。 |
+|===
+我们看一个具体的例子：
+----
+#include "php_wangyf.h"
+ZEND_FUNCTION(wangyf_return_long){
+    ZVAL_LONG(return_value,50);
+    return;
+}
+ZEND_FUNCTION(wangyf_hello_return){
+    RETURN_STRING("hello,this is return by extend!\n",1);
+    return;
+}
+ZEND_FUNCTION(wangyf_hello){
+    php_printf("hello,this is extend from wangyf!");
+}
+ZEND_FUNCTION(wangyf_return_array){
+    if(return_value_used){
+        int i,r;
+        //把返回值初始化为php语言中的数组
+        array_init(return_value);
+        for(i=0;i<100;i++){
+            r = rand() % (10000 + 1 - 100) + 100;
+            add_next_index_long(return_value,r);
+        }
+        return;
+    }else{
+        //抛出一个E_notice 级别错误
+        php_error_docref(NULL TSRMLS_CC,E_NOTICE,"小样，给你随机数了，你却不用");
+        RETURN_NULL();
+    }
+}
+ZEND_FUNCTION(wangyf_print_parameters_long){
+    long foo;
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC,"l",&foo) == FAILURE)
+        RETURN_NULL();
+    php_printf("the integer value of the parameter is:%ld\n",foo);
+    RETURN_TRUE;
+}
+ZEND_FUNCTION(wangyf_hello_name){
+    char *name;
+    int name_len;
+    char *greeting;
+    int greeting_len;
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC,"ss",&name,&name_len,&greeting,&greeting_len)==FAILURE)
+        RETURN_NULL();
+    php_printf("Hello ");
+    PHPWRITE(greeting,greeting_len);
+    php_printf(" ");
+    PHPWRITE(name,name_len);
+    php_printf("!\n");
+}
+static zend_function_entry wangyf_functions[] = {
+    ZEND_FE(wangyf_hello,NULL)
+    PHP_FE(wangyf_hello_return,NULL)
+    PHP_FE(wangyf_return_long,NULL)
+    PHP_FE(wangyf_return_array,NULL)
+    PHP_FE(wangyf_print_parameters_long,NULL)
+    PHP_FE(wangyf_hello_name,NULL)
+    {NULL,NULL,NULL}
+};
+
+
+zend_module_entry wangyf_module_entry = {
+    #if ZEND_MODULE_API_NO >= 20010901
+        STANDARD_MODULE_HEADER,
+    #endif
+    "wangyf",
+    wangyf_functions,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    #if ZEND_MODULE_API_NO >= 20010901
+        "2.1",
+    #endif
+    STANDARD_MODULE_PROPERTIES
+
+};
+#ifdef COMPILE_DL_WANGYF
+ZEND_GET_MODULE(wangyf)
+#endif
+
+----
+我们至此已经大致了解了php 的底层架构，以及php扩展的基本实现，包括sapi 的作用，接下来我们了解一下zend相关，因为 opcode 就是由zend 进行词法语法分析后产生的中间代码，并且执行也是有zend在执行，而opcache 的主要作用就是在zend 生成opcode 的时候将其缓存下来而省略了这整个php 执行周期中的一遍中间代码的转换，直接有zend 从缓存中读出并进行执行。找了一个 php 的更详细的声明周期图，我们再一起看一下
+
+image::../img/php.png[]
+
+=== 了解opcode ===
+我们可以看到 由 php 代码变为opcode ，并且执行的过程都在php_execule_script() 阶段。我们先看一段php代码转换为opcode后是什么样子的，在此我们用phpdbg 调试工具，功力有限，整个opcode 的生成过程是需要很深的编译原理功底，所以我们直接看一下php编译完成的opcode。
+源代码及运行结果：
+----
+<?php
+	$a = 1;
+	$b = 2;
+	$c = $a+$b;
+	const HELLO = " , ni hao !";
+	$names = ["xiao zhang","xiaowang wang","lao li"];
+	foreach ($names as $key =>$val){
+		echo $val . HELLO ."\n ";
+	}
+	unset($names[0]);
+	var_dump(array_values($names));
+	echo $c,"\n";
+?>
+
+#####
+localhost:test didi$ php test.php
+xiao zhang , ni hao !
+ xiaowang wang , ni hao !
+ lao li , ni hao !
+ array(2) {
+  [0]=>
+  string(13) "xiaowang wang"
+  [1]=>
+  string(6) "lao li"
+}
+3
+localhost:test didi$
+----
+phpdbg 查看相关opcode
+----
+bogon:test didi$ phpdbg -f test.php
+[Welcome to phpdbg, the interactive PHP debugger, v0.5.0]
+To get help using phpdbg type "help" and press enter
+[Please report bugs to <http://bugs.php.net/report.php>]
+[Successful compilation of /usr/local/var/www/test/test.php]
+prompt> list 100
+ 00001: <?php
+ 00002: 	$a = 1;
+ 00003: 	$b = 2;
+ 00004: 	$c = $a+$b;
+ 00005: 	const HELLO = " , ni hao !";
+ 00006: 	$names = ["xiao zhang","xiaowang wang","lao li"];
+ 00007: 	foreach ($names as $key =>$val){
+ 00008: 		echo $val . HELLO ."\n ";
+ 00009: 	}
+ 00010: 	unset($names[0]);
+ 00011: 	var_dump(array_values($names));
+ 00012: 	echo $c,"\n";
+ 00013: ?>
+ 00014:
+prompt> print exec
+[Context /usr/local/var/www/test/test.php (25 ops)]
+L1-14 {main}() /usr/local/var/www/test/test.php - 0x110086000 + 25 ops
+ L2    #0     ASSIGN                  $a                   1
+ L3    #1     ASSIGN                  $b                   2
+ L4    #2     ADD                     $a                   $b                   ~2
+ L4    #3     ASSIGN                  $c                   ~2
+ L5    #4     DECLARE_CONST           "HELLO"              " , ni hao !"
+ L6    #5     ASSIGN                  $names               array(3)
+ L7    #6     FE_RESET_R              $names               J14                  @5
+ L7    #7     FE_FETCH_R<224>         @5                   $val                 ~6
+ L7    #8     ASSIGN                  $key                 ~6
+ L8    #9     FETCH_CONSTANT<16>                           "HELLO"              ~8
+ L8    #10    CONCAT                  $val                 ~8                   ~9
+ L8    #11    CONCAT                  ~9                   "\n "                ~10
+ L8    #12    ECHO                    ~10
+ L8    #13    JMP                     J7
+ L8    #14    FE_FREE                 @5
+ L10   #15    UNSET_DIM               $names               0
+ L11   #16    INIT_FCALL<1>           96                   "var_dump"
+ L11   #17    INIT_FCALL<1>           96                   "array_values"
+ L11   #18    SEND_VAR                $names               1
+ L11   #19    DO_ICALL                                                          @11
+ L11   #20    SEND_VAR                @11                  1
+ L11   #21    DO_ICALL
+ L12   #22    ECHO                    $c
+ L12   #23    ECHO                    "\n"
+ L14   #24    RETURN<-1>              1
+prompt>
+
+----
+http://cn.php.net/manual/zh/internals2.opcodes.php[php手册提供的opcode]
+
+=== 了解 opcache ==
