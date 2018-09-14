@@ -357,6 +357,140 @@ prompt>
 ----
 http://cn.php.net/manual/zh/internals2.opcodes.php[php手册提供的opcode]
 
+----
+ZEND_API int zend_execute_scripts(int type, zval *retval, int file_count, ...) /* {{{ */
+{
+	va_list files;
+	int i;
+	zend_file_handle *file_handle;
+	zend_op_array *op_array;
+
+	va_start(files, file_count);
+	for (i = 0; i < file_count; i++) {
+		file_handle = va_arg(files, zend_file_handle *);
+		if (!file_handle) {
+			continue;
+		}
+    //解析opcode  假如有opcache 应该在 zend_compiled_file 处进行处理 ，或者直接有上层处理，里面应该包含词法语法解析
+		op_array = zend_compile_file(file_handle, type);
+		if (file_handle->opened_path) {
+			zend_hash_add_empty_element(&EG(included_files), file_handle->opened_path);
+		}
+		zend_destroy_file_handle(file_handle);
+    //判断opcode 是否存在
+		if (op_array) {
+      //执行 op_array
+			zend_execute(op_array, retval);
+			zend_exception_restore();
+			zend_try_exception_handler();
+			if (EG(exception)) {
+				zend_exception_error(EG(exception), E_ERROR);
+			}
+      //销毁op_array
+			destroy_op_array(op_array);
+      //释放空间
+			efree_size(op_array, sizeof(zend_op_array));
+		} else if (type==ZEND_REQUIRE) {
+			va_end(files);
+			return FAILURE;
+		}
+	}
+	va_end(files);
+
+	return SUCCESS;
+}
+----
+实际上，zend_compile_file 是一个函数指针，指向 compile_file -> zend_compile  主要调用zend 的语法和词法解析生成 opcode，所以在opcache里面有一个更好的策略，可将zend_compile_file 指向opcache 自己定义的函数即可。我们具体可以查看
+----
+
+static int accel_startup(zend_extension *extension)
+
+zend_op_array *persistent_compile_file(zend_file_handle *file_handle, int type)
+----
+accel_startup 是在扩展启动加载的时候就会执行，里面  通过
+
+accelerator_orig_compile_file = zend_compile_file;
+	zend_compile_file = persistent_compile_file;
+
+替换掉原有 zend_compile_file 指向的函数，却在  persistent_compile_file 里面进行了一些判断，知道最后调用
+zend_accel_load_script   从opcache里面获取数据。
+
+
+zend_accelerator_util_funcs.c
+----
+zend_op_array* zend_accel_load_script(zend_persistent_script *persistent_script, int from_shared_memory)
+{
+	zend_op_array *op_array;
+
+	op_array = (zend_op_array *) emalloc(sizeof(zend_op_array));
+	*op_array = persistent_script->script.main_op_array;
+
+	if (EXPECTED(from_shared_memory)) {
+		zend_hash_init(&ZCG(bind_hash), 10, NULL, NULL, 0);
+
+		ZCG(current_persistent_script) = persistent_script;
+		ZCG(arena_mem) = NULL;
+		if (EXPECTED(persistent_script->arena_size)) {
+#ifdef __SSE2__
+			/* Target address must be aligned to 64-byte boundary */
+			ZCG(arena_mem) = zend_arena_alloc(&CG(arena), persistent_script->arena_size + 64);
+			ZCG(arena_mem) = (void*)(((zend_uintptr_t)ZCG(arena_mem) + 63L) & ~63L);
+			fast_memcpy(ZCG(arena_mem), persistent_script->arena_mem, persistent_script->arena_size);
+#else
+			ZCG(arena_mem) = zend_arena_alloc(&CG(arena), persistent_script->arena_size);
+			memcpy(ZCG(arena_mem), persistent_script->arena_mem, persistent_script->arena_size);
+#endif
+		}
+
+		/* Copy all the necessary stuff from shared memory to regular memory, and protect the shared script */
+		if (zend_hash_num_elements(&persistent_script->script.class_table) > 0) {
+			zend_accel_class_hash_copy(CG(class_table), &persistent_script->script.class_table, (unique_copy_ctor_func_t) zend_class_copy_ctor);
+		}
+		/* we must first to copy all classes and then prepare functions, since functions may try to bind
+		   classes - which depend on pre-bind class entries existent in the class table */
+		if (zend_hash_num_elements(&persistent_script->script.function_table) > 0) {
+			zend_accel_function_hash_copy_from_shm(CG(function_table), &persistent_script->script.function_table);
+		}
+
+		/* Register __COMPILER_HALT_OFFSET__ constant */
+		if (persistent_script->compiler_halt_offset != 0 &&
+		    persistent_script->script.filename) {
+			zend_string *name;
+			char haltoff[] = "__COMPILER_HALT_OFFSET__";
+
+			name = zend_mangle_property_name(haltoff, sizeof(haltoff) - 1, ZSTR_VAL(persistent_script->script.filename), ZSTR_LEN(persistent_script->script.filename), 0);
+			if (!zend_hash_exists(EG(zend_constants), name)) {
+				zend_register_long_constant(ZSTR_VAL(name), ZSTR_LEN(name), persistent_script->compiler_halt_offset, CONST_CS, 0);
+			}
+			zend_string_release(name);
+		}
+
+		zend_hash_destroy(&ZCG(bind_hash));
+		ZCG(current_persistent_script) = NULL;
+	} else /* if (!from_shared_memory) */ {
+		if (zend_hash_num_elements(&persistent_script->script.function_table) > 0) {
+			zend_accel_function_hash_copy(CG(function_table), &persistent_script->script.function_table);
+		}
+		if (zend_hash_num_elements(&persistent_script->script.class_table) > 0) {
+			zend_accel_class_hash_copy(CG(class_table), &persistent_script->script.class_table, NULL);
+		}
+	}
+
+	if (op_array->early_binding != (uint32_t)-1) {
+		zend_string *orig_compiled_filename = CG(compiled_filename);
+		CG(compiled_filename) = persistent_script->script.filename;
+		zend_do_delayed_early_binding(op_array);
+		CG(compiled_filename) = orig_compiled_filename;
+	}
+
+	if (UNEXPECTED(!from_shared_memory)) {
+		free_persistent_script(persistent_script, 0); /* free only hashes */
+	}
+
+	return op_array;
+}
+----
+
 === 了解 opcache ===
 opcache 在php底层同样是以 扩展的形式出现的，我们看一下目录结构。
 
@@ -470,6 +604,26 @@ static zend_module_entry accel_module_entry = {
 	NO_MODULE_GLOBALS,
 	accel_post_deactivate,
 	STANDARD_MODULE_PROPERTIES_EX
+};
+//说明 opcode 即是php扩展也是zend扩展
+ZEND_EXT_API zend_extension zend_extension_entry = {
+	ACCELERATOR_PRODUCT_NAME,               /* name */
+	PHP_VERSION,							/* version */
+	"Zend Technologies",					/* author */
+	"http://www.zend.com/",					/* URL */
+	"Copyright (c) 1999-2018",				/* copyright */
+	accel_startup,					   		/* startup */
+	NULL,									/* shutdown */
+	accel_activate,							/* per-script activation */
+	accel_deactivate,						/* per-script deactivation */
+	NULL,									/* message handler */
+	NULL,									/* op_array handler */
+	NULL,									/* extended statement handler */
+	NULL,									/* extended fcall begin handler */
+	NULL,									/* extended fcall end handler */
+	NULL,									/* op_array ctor */
+	NULL,									/* op_array dtor */
+	STANDARD_ZEND_EXTENSION_PROPERTIES
 };
 ----
 从代码中可知，opcache 对外提供了六个函数  【opcache_reset,opcache_invalidate,opcache_compile_file,opcache_is_script_cached】 +
@@ -754,8 +908,8 @@ typedef struct _zend_accel_hash {
 } zend_accel_hash;
 
 typedef struct _zend_blacklist_entry {
-    char *path;
-    int   path_length;
+  char *path;
+  int   path_length;
 	int   id;
 } zend_blacklist_entry;
 
@@ -767,3 +921,8 @@ typedef struct _zend_blacklist {
 } zend_blacklist;
 
 ----
+* ZSMMG(element): 共享内存管理区
+* ZCSG(element): 共享全局变量
+* ZCG(element): 进程内全局变量
+
+image::../img/2017-01-13-impletation-of-opcache-shm-memory-structure.png[]
