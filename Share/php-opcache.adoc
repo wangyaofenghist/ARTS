@@ -66,7 +66,7 @@ cli/cgi 单进程下的执行流程:
 
 image::../img/02-01-01-cgi-lift-cycle.png[]
 
-基于此，cli 模式下 每次执行php 都需要进行 MInit，RInit，rShutDown，MshutDown这四个阶段，但是在web 模式下 其实 Minit 与 MshutDown 是没有必要每次都启动的，只需要启动一次即可。所以基于此就有了php-fpm ，遵循fastcgi 模式，多进程模式进行管理php。
+基于此，cli 模式下 每次执行php 都需要进行 MInit，RInit，rShutDown，MshutDown这四个阶段(遵循cgi协议)，但是在web 模式下 其实 Minit 与 MshutDown 是没有必要每次都启动的，只需要启动一次即可。所以基于此就有了php-fpm ，遵循fastcgi 模式，多进程模式进行管理php。
 ----
           MINIT
               RINIT
@@ -81,13 +81,43 @@ fpm             ...
           MshutDown
           ...
 ----
+我们看一下 fpm 具体的启动过程  从 sapi/fpm/fpm/fpm_main.c 开始。
 
-也就是 fpm 维护了这么一个进程池，master 管理多个 worker ，每个worker 在都已经运行了MINIT 当一个web 请求发送过来后，通过fastcgi协议，将具体需要执行的代码发送给fpm，fpm 将其转发到 一个worker 中进行执行，并将执行结果返回。此处与nginx 的模式还不一样，最大的区别在于每一个phpfpm进程只能处理一个请求，请求结束，才能开始处理下一个。而nginx 采用的虽然也是master - worker 多进程 模式，但是不同点在于nginx采用的高级IO 通过 epoll 、poll、select等机制进行处理，不需要等某一次请求完全结束才执行下次请求，所以并发能力是没法比较的。
+----
+api/fpm/fpm/fpm_main.c
+main =>    zend_signal_startup()
+     =>    sapi_starup(&cgi_sapi_module)  => php_cgi_startup =>  php_module_startup() => php_ini_register_extensions =>...
+
+main/php_ini.c
+php_ini_register_extensions => 	zend_llist_apply(&extension_lists.engine, php_load_zend_extension_cb);
+                            =>  zend_llist_apply(&extension_lists.functions, php_load_php_extension_cb);
+
+Zend/zend_llist.c 开始了循环加载各种扩展和模块。
+ZEND_API void zend_llist_apply(zend_llist *l, llist_apply_func_t func)
+{
+	zend_llist_element *element;
+
+	for (element=l->head; element; element=element->next) {
+		func(element->data);
+	}
+}
+
+----
+php_module_startup()[main/main.c]
+
+php_ini_register_extensions()[main/php_ini.c]
+
+
+再多说一下php-fpm，fpm 维护了这么一个进程池（遵循fastcgi），master 管理多个 worker ，每个worker 在都已经运行了MINIT 当一个web 请求发送过来后，通过fastcgi协议，将具体需要执行的代码发送给fpm，fpm 将其转发到 一个worker 中进行执行，并将执行结果返回。此处与nginx 的模式还不一样，最大的区别在于每一个phpfpm进程只能处理一个请求，请求结束，才能开始处理下一个。而nginx 采用的虽然也是master - worker 多进程 模式，但是不同点在于nginx采用的高级IO 通过 epoll 、poll、select等机制进行处理，不需要等某一次请求完全结束才执行下次请求，所以并发能力是没法比较的。
+
+找了一个 php 的更详细的生命周期图，我们再一起看一下
+
+image::../img/php.png[]
 
 
 === php 扩展 ===
 
-了解完php 的相关的整体架构，我们开始看一下php扩展。php 扩展只是从php底层架构层面来说，对应应用层其实是无感知的，无论你用array去构建一个数组，还是调用pdo 去连接mysql 都是扩展实现，而与zend 和 sapi 无关，而在次过程中，php业务层是无需关注的。
+了解完php 的相关的整体架构，我们开始看一下php扩展。php 扩展只是从php底层架构层面来说，对应应用层其实是无感知的，无论你用array去构建一个数组，还是调用pdo 去连接mysql 其实主要代码都是有php扩展实现，而与zend 和 sapi 无太多关系，而在此过程中，php业务层是无需关注的，而向xdebug、opcache 此类的扩展，其实不但是php的扩展，同时也是zend的扩展，但是总体可以当做php扩展看待。
 
 php7.2.3 ext 目录扩展
 ----
@@ -266,9 +296,9 @@ ZEND_GET_MODULE(wangyf)
 #endif
 
 ----
-我们至此已经大致了解了php 的底层架构，以及php扩展的基本实现，包括sapi 的作用，接下来我们了解一下zend相关，因为 opcode 就是由zend 进行词法语法分析后产生的中间代码，并且执行也是有zend在执行，而opcache 的主要作用就是在zend 生成opcode 的时候将其缓存下来而省略了这整个php 执行周期中的一遍中间代码的转换，直接有zend 从缓存中读出并进行执行。找了一个 php 的更详细的声明周期图，我们再一起看一下
+我们至此已经大致了解了php 的底层架构，以及php扩展的基本实现，包括sapi 的作用，接下来我们了解一下zend相关，因为 opcode 就是由zend 进行词法语法分析后产生的中间代码，并且执行也是有zend在执行，而opcache 的主要作用就是在zend 生成opcode 的时候将其缓存下来而省略了这整个php 执行周期中的一遍中间代码的转换，直接由zend 从缓存中读出并进行执行。
 
-image::../img/php.png[]
+
 
 === 了解opcode ===
 我们可以看到 由 php 代码变为opcode ，并且执行的过程都在php_execule_script() 阶段。我们先看一段php代码转换为opcode后是什么样子的，在此我们用phpdbg 调试工具，功力有限，整个opcode 的生成过程是需要很深的编译原理功底，所以我们直接看一下php编译完成的opcode。
@@ -573,8 +603,8 @@ zend_shared_memory_handlers zend_alloc_win32_handlers = {
 ----
 一个C语言下的简单工厂就实现了，而在 zend_shared_alloc.h中，我们可以清楚的看到，更清晰的逻辑以及一些基础数据结构定义。
 
-至此，我们不能再从上而下分析了，但是我们可大概定位一些动
-zend_accelerator_debug  大致看一眼，是一些相关错误级别，错误输出函数的定义。根据之前的知识，我们直接找到opcache扩展的 zend_module_entry，zend_function_entry 找到对外提供的函数以及模块启动过程中的加载与注销。
+至此，我们不能再从上而下分析了，但是我们可大概定位一些东西 比如：
+zend_accelerator_debug  大致看一眼，是一些相关错误级别，错误输出函数的定义。然后我们根据之前的知识，我们直接找到opcache扩展的 zend_module_entry，zend_function_entry 找到对外提供的函数以及模块启动过程中的加载与注销。
 
 zend_accelerator_module.c
 
@@ -638,7 +668,7 @@ ZEND_MSHUTDOWN(zend_accelerator),
 
 通过zend_accel_info 返回 phpinfo() 中的信息
 
-
+opcache_compile_file（）  编译并缓存 PHP 脚本  ，我们来看一下主要流程
 ====  opcache_compile_file ====
 ----
 static ZEND_FUNCTION(opcache_compile_file)
@@ -698,7 +728,9 @@ persistent_compile_file 函数，重点部分
          */
        	from_shared_memory = 0;
 		persistent_script = opcache_compile_file(file_handle, type, key, &op_array);
+    //进行缓存
 		if (persistent_script) {
+      // 具体存储时候的 数据内存结构可以 从这里进去通过相关逻辑理解
 			persistent_script = cache_script_in_shared_memory(persistent_script, key, key ? key_length : 0, &from_shared_memory);
 		}
 
@@ -715,7 +747,7 @@ persistent_compile_file 函数，重点部分
 	return zend_accel_load_script(persistent_script, from_shared_memory);
 }
 ----
-opcache_compile_file
+opcache_compile_file 函数主要内容
 ----
 zend_try {
 		orig_compiler_options = CG(compiler_options);
@@ -732,6 +764,7 @@ zend_try {
 	} zend_end_try();
 
 ----
+accelerator_orig_compile_file 指向了  zend_compile_file  ，zend_compile_file 原本指向 compile_file 即 扫描解析php源代码生成opcode 的过程。
 ----
 static int accel_startup(zend_extension *extension){
   ...
@@ -755,7 +788,7 @@ ZEND_API zend_op_array *compile_file(zend_file_handle *file_handle, int type);
 ...
 ----
 
-zend_language_scanner.l
+zend_language_scanner.c
 ----
 ZEND_API zend_op_array *compile_file(zend_file_handle *file_handle, int type)
 {
@@ -907,6 +940,8 @@ typedef struct _zend_accel_hash {
 	uint32_t               num_direct_entries;
 } zend_accel_hash;
 
+zend_accel_hash 组成了一个hashTable，应该就是 opcache 存储的时候的数据结构了。
+
 typedef struct _zend_blacklist_entry {
   char *path;
   int   path_length;
@@ -920,9 +955,23 @@ typedef struct _zend_blacklist {
 	zend_regexp_list     *regexp_list;
 } zend_blacklist;
 
+zend_blacklist 更想是一个表格，分别针每一行都是一个路径路径信息，可以对应到opcache的黑名单数据结构。
+
 ----
+opcache中常用的宏命令
+
 * ZSMMG(element): 共享内存管理区
 * ZCSG(element): 共享全局变量
 * ZCG(element): 进程内全局变量
+
+php内核中常用的宏命令
+
+* EG  Executor Global  Zend 执行时信息 （主要功能是查找全局变量_zend_executor_globals中的成员）
+* CG  Complier Global  Zend编译器相关的全局变量 （用来访问核心全局变量）
+* PG  PHP Core Global     主要存储php.ini中的信息
+* SG  SAPI Global         SAPI信息
+* FG  File Global         文件全局变量  大多数文件I/O或相关的全局变量的数据流都塞进标准扩展出口结构。
+
+看一下网上对opcache 相关内存存储结构的分布图
 
 image::../img/2017-01-13-impletation-of-opcache-shm-memory-structure.png[]
