@@ -387,6 +387,7 @@ prompt>
 ----
 http://cn.php.net/manual/zh/internals2.opcodes.php[php手册提供的opcode]
 
+zend 执行 php 的核心函数
 ----
 ZEND_API int zend_execute_scripts(int type, zval *retval, int file_count, ...) /* {{{ */
 {

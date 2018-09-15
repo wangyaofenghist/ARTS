@@ -1,0 +1,35 @@
+== maximum-depth-of-binary-tree
+=== 题目描述
+----
+Given a binary tree, find its maximum depth.
+
+The maximum depth is the number of nodes along the longest path from the root node down to the farthest leaf node.
+
+----
+
+=== 分析
+给出一个二叉树，求最大路径（最大路径是指从根节点到叶子节点最长路径的节点数）。
+从跟节点到叶子节点最长路径上的节点数，其实就是最大深度嘛，只需要向下不停的遍历，每遍历一层深度+1 直到叶子节点，然后计算最大值返回即可。
+这是一个很典型的递归问题。
+
+=== 考察点
+二叉树，递归
+
+=== 代码实现
+----
+class Solution{
+  public：
+    int maxDepth(TreeNode *root){
+      int depth = 0;
+      return maxDepthTwo(root,depth);
+    }
+    int maxDepthTwo(TreeNode *root,int depth){
+      if(root == NULL){
+        return 0;
+      }
+      int left = maxDepthTwo(root->left,depth+1);
+      int right = maxDepthTwo(root->left,depth+1);
+      return max(left,right)+1;
+    }
+}
+----
