@@ -1,0 +1,102 @@
+== binary-tree-zigzag-level-order-traversal || binary-tree-level-order-traversal
+=== 题目描述
+
+----
+Given a binary tree, return the zigzag level order traversal of its nodes' values. (ie, from left to right, then right to left for the next level and alternate between).
+
+For example:
+Given binary tree{3,9,20,#,#,15,7},
+
+    3
+   / \
+  9  20
+    /  \
+   15   7
+
+return its zigzag level order traversal as:
+
+[
+  [3],
+  [20,9],
+  [15,7]
+]
+
+confused what"{1,#,2,3}"means? > read more on how binary tree is serialized on OJ.
+
+
+OJ's Binary Tree Serialization:
+The serialization of a binary tree follows a level order traversal, where '#' signifies a path terminator where no node exists below.
+
+Here's an example:
+
+   1
+  / \
+ 2   3
+    /
+   4
+    \
+     5
+The above binary tree is serialized as"{1,2,3,#,#,4,#,#,5}".
+----
+
+=== 分析
+
+题目要求将二叉树按照层级Z字形顺序返回结果，肯定是一个层级遍历需要用到队列，假设根所在的一层为第一层，则第二层应该倒序，第三层正序，第四层倒序
+可以看出，偶数层倒序，奇数层保持不变。我们可以通过层级遍历实现。
+
+=== 代码实现
+
+binary-tree-zigzag-level-order-traversal
+----
+class Solution{
+  public:
+    vector<vector<int> > zigzagLevelOrder(TreeNode *root){
+      vector <vector<int> > res;
+      queue<TreeNode *> que;
+      if(root != NULL)
+        que.push(root);
+      while(que.size()>0){
+        vector <int> tmp;
+        int len = que.size();
+        for(int i=0;i<len;i++){
+          treeNode *p = que.front();
+          que.pop();
+          if(p->left) que.push(p->left);
+          if(p->right) que.push(p->right);
+          tmp.push_bach(p->val);
+        }
+        //res.size() 为奇数是，说明下一个要放的为偶数，所以tmp 要反转后再放入
+        //去掉此行即为 正常 的层级遍历
+        if(res.size()%2 != 0  ) reverse(tmp.begin(),tmp.end());
+        res.push_back(tmp);
+      }
+      return res;
+    }
+}
+----
+
+binary-tree-level-order-traversal
+----
+class Solution{
+  public:
+    vector<vector<int> > zigzagLevelOrder(TreeNode *root){
+      vector <vector<int> > res;
+      queue<TreeNode *> que;
+      if(root != NULL)
+        que.push(root);
+      while(que.size()>0){
+        vector <int> tmp;
+        int len = que.size();
+        for(int i=0;i<len;i++){
+          treeNode *p = que.front();
+          que.pop();
+          if(p->left) que.push(p->left);
+          if(p->right) que.push(p->right);
+          tmp.push_bach(p->val);
+        }
+        res.push_back(tmp);
+      }
+      return res;
+    }
+}
+----
