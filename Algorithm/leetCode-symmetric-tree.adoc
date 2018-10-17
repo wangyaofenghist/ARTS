@@ -1,0 +1,90 @@
+== symmetric-tree
+=== 题目描述
+----
+Given a binary tree, check whether it is a mirror of itself (ie, symmetric around its center).
+
+For example, this binary tree is symmetric:
+
+    1
+   / \
+  2   2
+ / \ / \
+3  4 4  3
+
+But the following is not:
+
+    1
+   / \
+  2   2
+   \   \
+   3    3
+
+Note:
+Bonus points if you could solve it both recursively and iteratively.
+
+confused what"{1,#,2,3}"means? > read more on how binary tree is serialized on OJ.
+
+
+OJ's Binary Tree Serialization:
+The serialization of a binary tree follows a level order traversal, where '#' signifies a path terminator where no node exists below.
+
+Here's an example:
+
+   1
+  / \
+ 2   3
+    /
+   4
+    \
+     5
+The above binary tree is serialized as"{1,2,3,#,#,4,#,#,5}".
+
+----
+
+=== 分析
+给定一个二叉树，检测他是否是最深的影响，也就是是否完全对称。
+首先一个反应就是成绩遍历，利用栈的数据结构，但是会存在一种问题，类似于实例中的第二棵树，这种情况下是不对的，所以，淡出的栈是不行的，因为
+有左右子树位置之分，不能按照节点值，同样中序遍历也是不行的。
+----
+              1
+
+          /       \
+         2          2
+        /  \      /   \
+       3    4    4     3
+      / \  / \  / \   / \
+     5  6 6  5  5  6  6  5
+----
+仔细分析一下，其实此题有四层的时候就方便分析了，如上所示，如果要从根节点 1 到叶子节点对称，则需 root->left 和 root->right 对称
+我们的递归公式应该为
+
+f(root) = (root->left->val == root -> right->val ) &&  f(left->left == right->right) && f(left->right == right->left)
+
+=== 考察点
+
+递归，模拟
+
+=== 代码实现
+
+----
+clase Solution {
+  public :
+    bool isSymmetric(TreeNode *root){
+      if(root == NULL)
+        return true;
+      return isEqual(root->left,root->right);
+    }
+    bool isEqual(TreeNode *left,TreeNode *right){
+      if(left == NULL && right == NULL){
+        return true;
+      }
+      if(left == NULL || right == NULL ){
+        return false;
+      }
+      if(left->val != right->val){
+        return false;
+      }
+      return isEqual(left->left,right->right) && isEqual(left->right,right->left);
+    }
+}
+----
