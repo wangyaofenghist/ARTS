@@ -1,0 +1,69 @@
+== interleaving-string
+=== 题目描述
+----
+Given s1, s2, s3, find whether s3 is formed by the interleaving of s1 and s2.
+
+For example,
+Given:
+s1 ="aabcc",
+s2 ="dbbca",
+
+When s3 ="aadbbcbcac", return true.
+When s3 ="aadbbbaccc", return false.
+----
+=== 分析
+给定三个字符串，s1,s2,s3将 s1，s2交织穿插是否能够组成s3，如果s3可以通过s1，s2 穿插组成，返回true，否则返回false。
+如果熟悉动态规划的话，我们会发现我们需要设定一个值，以便将现有问题缩减，然后通过小问题的动态组合，得到大问题的解。
+我们假设dp[i][j] 标示 s1[0~i] 与 s2[0~j] 可以顺序组合/匹配成 s3[0~i+j]，因此 dp[i][j]为布尔值，然后我们需要
+初始化dp[0][0],dp[0][j],dp[i][0]，等边界值，我们定义 ch1，ch2，ch3 为相应的char型数据，len1，len2，len3 为
+相应的字符串长度。可知：
+----
+dp[0][0] =true
+dp[0][j] == dp[0][j-1] && ch2[j-1] == ch3[j-1]
+dp[i][0] == dp[i-1][0] && ch1[i-1] == ch3[i-1]
+----
+然后考虑初始化 dp[i][j] 中非边界的值，此时的规划公式应该如何标示
+----
+dp[i][j] = dp[i-1][j] &&(ch1[i-1]==ch3[i-1+j])
+          || dp[i][j-1] && (ch2[j-1] == ch3[j-1+i])
+----
+最终，dp[len1][len2]即为所求，整个过程即为动态规划。
+
+=== 考察
+动态规划，问题分析能力
+
+=== 代码实现
+
+----
+class Solution {
+
+public:
+    bool isInterleave(string s1, string s2, string s3) {
+        int len1=s1.length();
+        int len2=s2.length();
+        int len3=s3.length();
+        if(len1 + len2 != len3){
+            return false;
+        }
+        //dp[i][j] 代表 s1[0...i] s2[0...j] 是否能够组成（顺序匹配） s3[0..i+j]
+        vector <vector <bool> > dp(len1+1,vector<bool>(len2+1,false));
+        //初始化 s1中取0个字符 s2中取0个字符 匹配s3从0开始的0个字符 肯定匹配true
+        dp[0][0] = true;
+        //s1中取0个s2中取i个 去和s3中0+i 个匹配
+        for(int i=1;i<=len1;i++)
+            dp[i][0] = dp[i-1][0] && s1[i-1] == s3[i-1];
+
+        //s2中取0个s1中取i个 去和s3中0+i 个匹配
+        for(int j=1;j<=len2;j++){
+            dp[0][j] = dp[0][j-1] && s2[j-1] == s3[j-1];
+        }
+        for(int i=1;i<=len1;i++){
+            for(int j=1;j<=len2;j++){
+                //s3[0..i+j-1] 能否被组合成 首先要看 前一个 （dp[i-1][j],dp[i][j-1] 都是前一个组合是否能组合成）是否能组合成
+                dp[i][j] = (dp[i-1][j] && s1[i-1] == s3[i+j-1]) || (dp[i][j-1] && s2[j-1] == s3[i+j-1]);
+            }
+        }
+        return dp[len1][len2];
+    }
+};
+----
