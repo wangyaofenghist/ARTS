@@ -1,5 +1,5 @@
-==recover-binary-search-tree
-===题目描述
+== recover-binary-search-tree
+=== 题目描述
 ----
 Two elements of a binary search tree (BST) are swapped by mistake.
 
@@ -25,7 +25,7 @@ Here's an example:
      5
 The above binary tree is serialized as"{1,2,3,#,#,4,#,#,5}".
 ----
-===分析
+=== 分析
 
 二叉查找树（Binary Search Tree），（又：二叉搜索树，二叉排序树）它或者是一棵空树，或者是具有下列性质的二叉树：
 若它的左子树不空，则左子树上所有结点的值均小于它的根结点的值； 若它的右子树不空，
@@ -37,10 +37,10 @@ The above binary tree is serialized as"{1,2,3,#,#,4,#,#,5}".
 二叉搜索树遵循的是 左小，右大的规则（拿到父节点的val 与 当前节点的val 对比），只要不符合规则，即算一个。需要递归，
 时间O(n)、空间复杂度O(1)
 
-===考察点
+=== 考察点
 二叉树，递归，问题转换
 
-===算法实现
+=== 算法实现
 ----
 class Solution{
   TreeNode *pre,*a,*b;

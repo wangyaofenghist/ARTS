@@ -1,5 +1,5 @@
-==validate-binary-search-tree
-===题目描述
+== validate-binary-search-tree
+=== 题目描述
 ----
 Given a binary tree, determine if it is a valid binary search tree (BST).
 
@@ -27,7 +27,7 @@ Here's an example:
 The above binary tree is serialized as"{1,2,3,#,#,4,#,#,5}".
 ----
 
-===分析
+=== 分析
 判断一个二叉树是不是二叉搜索树（BST），BST简单定义为：1.左节点的值小于跟节点。 2.右节点的值大于根节点 3.左右子树均为BST
 从定义上来看，首先想到的是一个递归结构，那么收敛条件 必然有 如下：
 ----
@@ -50,10 +50,10 @@ if (root->right != NULL && root->right->val <= root->val){
 }
 ----
 
-===考察点
+=== 考察点
 递归，二叉树
 
-===代码实现
+=== 代码实现
 
 ----
 class Solution {
