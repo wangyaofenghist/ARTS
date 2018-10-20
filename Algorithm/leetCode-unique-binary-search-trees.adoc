@@ -1,0 +1,79 @@
+== unique-binary-search-trees
+=== 题目描述
+----
+Given n, how many structurally unique BST's (binary search trees) that store values 1...n?
+
+For example,
+Given n = 3, there are a total of 5 unique BST's.
+
+   1         3     3      2      1
+    \       /     /      / \      \
+     3     2     1      1   3      2
+    /     /       \                 \
+   2     1         2                 3
+----
+
+=== 分析
+给出一个数值n，1-n的值可以组合成多少种相互唯一的二叉搜索树。
+1. 将从1-n 的n个值分别作为根节点，求当 根节点为 1<=k<=n 时，左右子树的组合个数，是一个递归操作，收敛条件为 n==1 时候，只有一种可能(return 1)，其余情况 根节点为k相互不同的二叉树个数 f(k) = f(k->left)*f(k->right)  =>  f(1 ~ k)*f(k ~ n) => f(i-1)*f(n-i)。
+----
+uniqueNum:n
+  if (n==1)
+    return 1;
+  int sum = 0;
+  for(int i=1;i<n;i++){
+    sum += uniqueNum(i-1)*uniqueNum(n-i);
+  }
+  return sum
+----
+2. 另一种思路，我们假设dp[n] 表示，当数值为n的时候所求的值为dp[n],也就是说dp为int类型的一维数组，由于也是基于1..n为节点，则左子树的节点为【1 , ... ,i-1】右子树的节点为【i+1, ... ,n】.
+我们知道 dp[1] = 1 ,dp[2] =2 ,dp[3] = 5, dp[4] =14 此时应该如何求解dp[5] 这是一个核心问题？
+我需要去构建一棵树，确定根节点 然后知道 节点下左子树和右子树的可能有多少，然后相乘即可得出。
+我们构建一个{1，2，3，4，5}的树，我们先用 1 做节点，left 为空，right 为{2，3，4，5}，显然和 用5 做节点 left 为{1，2，3，4} ，right 为空是一样的结果，那么 1 下的 树的总数为 dp[0] * dp[4] (dp[0]=1),同理 root 为 2 有 dp[1]*dp[3],root 为 3 有 dp[2]*dp[2],root 为4 有 dp[3]*dp[1] ，root为5有dp[0] * dp[4],最后求和即为结果。
+dp[5] = (dp[0]*dp[4])+(dp[1]*dp[3])+(dp[2]*dp[2])+(dp[3]*dp[1])+(dp[4]*dp[0])
+很容易我们得到了基本的计算公式  dp[k] = sum {dp[i] * dp[k-i] }(0<i<k)
+代码表述为:
+----
+dp[0]=1;
+dp[1]=1;
+for(int i=2;i<n;i++){
+  for (int j=1;j<i;j++)
+    dp[i] += dp[j-1]*dp[i-j]
+}
+----
+则 dp[n]即为所求
+
+=== 考察点
+递归，动态规划，问题分析带入能力
+
+=== 代码实现
+
+----
+class Solution {
+public:
+    //第一种方法，左子树个数 * 右子树个数递归
+    int numTrees(int n) {
+        if(n<=1)
+            return 1;
+        int sum=0 ;
+        for(int i=1;i<=n;i++){
+            sum += numTrees(i-1) * numTrees(n-i);
+        }
+        return sum;
+    }
+    //第二种方法  动态规划
+    int numTrees(int n) {
+        if(n<=0)
+            return 0;
+        vector <int > dp(n+1,0);
+        dp[0]=1;
+        for(int i=0;i<=n;i++){
+            for(int j=0;j<i;j++){
+                // n =i的时候，左子树 dp[j] * dp[i-j+1] 右子树 的个数 就是 dp[i] 的个数
+                dp[i] += dp[j] * dp[i-j-1];
+            }
+        }
+        return dp[n];
+    }
+};
+----
