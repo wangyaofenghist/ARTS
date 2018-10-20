@@ -36,6 +36,11 @@ The above binary tree is serialized as"{1,2,3,#,#,4,#,#,5}".
 先不考虑复杂度，涉及到树，一般都会涉及到递归，题目中说了，只有两个节点需要交换，只需要找到错误的两个节点，然后交换即可
 二叉搜索树遵循的是 左小，右大的规则（拿到父节点的val 与 当前节点的val 对比），只要不符合规则，即算一个。需要递归，
 时间O(n)、空间复杂度O(1)
+
+===考察点
+二叉树，递归，问题转换
+
+===算法实现
 ----
 class Solution{
   TreeNode *pre,*a,*b;
@@ -50,9 +55,11 @@ class Solution{
     if(!root) return ;
     dfs(root->left);
     if(pre!=NULL && pre->val>root->val){
+      //a 肯定是错误的节点，但是 b 不一定就是错误的节点，所以 b 应该不停的更新
       if(a!=NULL) a = pre;
-      second = root;
+      b = root;
     }
+    //pre 放到此处 需要 在最后一个 有叶子节点的 位置开始比较
     pre =root;
     dfs(root->right);
   }

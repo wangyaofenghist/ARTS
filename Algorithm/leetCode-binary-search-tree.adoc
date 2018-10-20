@@ -1,0 +1,73 @@
+==validate-binary-search-tree
+===题目描述
+----
+Given a binary tree, determine if it is a valid binary search tree (BST).
+
+Assume a BST is defined as follows:
+
+The left subtree of a node contains only nodes with keys less than the node's key.
+The right subtree of a node contains only nodes with keys greater than the node's key.
+Both the left and right subtrees must also be binary search trees.
+
+confused what"{1,#,2,3}"means? > read more on how binary tree is serialized on OJ.
+
+
+OJ's Binary Tree Serialization:
+The serialization of a binary tree follows a level order traversal, where '#' signifies a path terminator where no node exists below.
+
+Here's an example:
+
+   1
+  / \
+ 2   3
+    /
+   4
+    \
+     5
+The above binary tree is serialized as"{1,2,3,#,#,4,#,#,5}".
+----
+
+===分析
+判断一个二叉树是不是二叉搜索树（BST），BST简单定义为：1.左节点的值小于跟节点。 2.右节点的值大于根节点 3.左右子树均为BST
+从定义上来看，首先想到的是一个递归结构，那么收敛条件 必然有 如下：
+----
+if （root == NULL ）
+  return true;
+----
+还应该有一个按照 定义 【1，2】收敛的条件，  如下
+----
+if(root->val <= low || root->val >=upper) return false;
+----
+为什么不用下面的 条件，可以考虑一下，下面的条件是一个一个节点的进行判断，但是并不能判断 左子树的所有节点均小于根，右子树的所有节点
+均大于根。而抽象出来 low，upper 后，只需要将 root->val 付给其中的一个值，即可递归向下走，实现左子树所有节点小于根，右子树所有
+节点大于根。
+----
+if (root->left != NULL && root->left->val >= root->val){
+    return false;
+}
+if (root->right != NULL && root->right->val <= root->val){
+    return false;
+}
+----
+
+===考察点
+递归，二叉树
+
+===代码实现
+
+----
+class Solution {
+public:
+    bool isValidBST(TreeNode *root) {
+        //return isBST(root,INT_MIN,INT_MAX);
+        return isBST(root);
+    }
+    bool isBST(TreeNode * root,int low,int upper){
+        if(root == NULL)
+            return true;
+        if(root->val <= low || root->val >=upper) return false;
+        return isBST(root->left,low,root->val) && isBST(root->right,root->val,upper);
+    }
+
+};
+----
