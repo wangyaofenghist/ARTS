@@ -1,0 +1,98 @@
+== restore-ip-addresses
+
+=== 题目描述
+
+----
+Given a string containing only digits, restore it by returning all possible valid IP address combinations.
+
+For example:
+Given"25525511135",
+
+return["255.255.11.135", "255.255.111.35"]. (Order does not matter)
+
+
+----
+
+=== 分析
+给定一个字符串，然后我们返回所有合法的ip地址。
+首先我们想一想ip地址的规则
+1. 分四段
+2. 每段 大小从 【0-255】
+3. 讨论一些特殊情况，比如：ip地址首段能否为 0  【0.1.0.0】.
+
+也就是说，我们只需要对字符串分割三次，判断每一段是否符合规则，即可判断总结果是否符合规则。进一步抽象，我们只需要每次从一个字符串中切
+出 1-3 位字符串，然后判断是否符合分析的ip地址的后两条（2，3）规则，如果符合，接着分割，如果不符合，则返回上一次分割进行从新尝试。很
+明显，这是一个需要回溯的过程，而收敛条件就是，分割不能超过3次。我们来看一下代码主题
+----
+//result string 数组为返回结果，t为ip地址已经组成的部分，s为剩余的要分割的string 部分，count为分割的次数
+DFS：(vector<string> &result,string t,string s,int count)
+  //先定义收敛条件
+  if (count == 3 && isValid(s)) {
+    result.push_back(t+s);
+    return ;
+  }
+  for (int i=1;i<4 && i<s.size();i++){
+    string sub = s.substr(0,i);
+    if(isValid(sub))
+      DFS(result,t+sub+'.',s.substr(i),count+1);
+  }
+
+----
+很明显，这是一个DFS问题，isValid（string） 所要做的就是校验特殊情况每一段是否是符合规则的了。
+
+----
+isValid:（string &s）
+  //转换类型
+  stringstream str;
+  int num;
+  str << s;
+  str >> num;
+  //进行校验
+  if (s.size()>1){
+    return s[0]!='0' && num>0 && num<=255;
+  }
+  return num>=0 && num<=255;
+----
+
+=== 考察点
+回溯思想，问题分析带入能力
+
+=== 代码实现
+
+----
+class Solution {
+public:
+    vector<string> restoreIpAddresses(string s) {
+        vector <string> result;
+        string t;
+        DFS(result,t,s,0);
+        return result;
+    }
+    //不停的深度优先
+    void DFS(vector<string> &result,string t,string s,int count){
+        //已有count ==3 并且 s 符合条件 合并 t+s 入数组
+        if(count == 3 && isValid(s)){
+            result.push_back(t+s);
+            return ;
+        }
+        //每一个ip地址不能大于4段，所以只需要截取3次 i<4  i<s.size() 是在剪支
+        for(int i=1;i<4 && i<s.size();i++){
+            string sub = s.substr(0,i);
+            if(isValid(sub))
+                DFS(result,t+sub+'.',s.substr(i),count+1);
+        }
+    }
+    bool isValid(string &s){
+        //stringstream ss(s);
+        stringstream ss;
+        //通过字符流将字符型转换为数字型 可以通过 stringstream ss(s); ss>>num;直接替换
+        int num;
+        ss << s;
+        ss >> num;
+        //当ip地址中的一位数字大于各位数是，第一位数字不能为0  例如 ：0.1.001.0
+        if(s.size()>1)
+            return s[0]!='0' && num>0 && num<=255;
+        return num>=0 && num<=255;
+    }
+};
+----

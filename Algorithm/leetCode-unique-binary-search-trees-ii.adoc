@@ -1,0 +1,102 @@
+== unique-binary-search-tree-ii
+
+=== 题目描述
+----
+Given n, generate all structurally unique BST's (binary search trees) that store values 1...n.
+
+For example,
+Given n = 3, your program should return all 5 unique BST's shown below.
+
+   1         3     3      2      1
+    \       /     /      / \      \
+     3     2     1      1   3      2
+    /     /       \                 \
+   2     1         2                 3
+
+confused what"{1,#,2,3}"means? > read more on how binary tree is serialized on OJ.
+
+
+OJ's Binary Tree Serialization:
+The serialization of a binary tree follows a level order traversal, where '#' signifies a path terminator where no node exists below.
+
+Here's an example:
+
+   1
+  / \
+ 2   3
+    /
+   4
+    \
+     5
+The above binary tree is serialized as"{1,2,3,#,#,4,#,#,5}".
+
+----
+
+=== 分析
+相对于第一题，此题不在在乎给定一个数值N我们可以得到多少个唯一的二叉搜索树。
+第一题分析中动态规划已经不再试用此题。但是我们可以参考第一中思想，也就是 从1-N轮流做根节点，然后去不停的构造二叉树。
+但是她的左右子树同样也需要不停的拆解，才能够确保得到所有情况的解，很明显有递归的味道，但是如何将结果存储呢？
+我们先假设不存储，用伪代码进行一下梳理
+----
+create：（left，right）
+  vector <TreeNode * >res;
+  //收敛条件
+  if (left>right){
+    return res
+  }
+  //循环递归
+  for (int i=left;i<=right;i++){
+    leftTree =cerate(left,i-1);
+    rightTree = create(i+1,right);
+    //组合每种情况的二叉树
+    for（int l = 0;l<leftTree.size();l++）{
+      for (int k = 0;k<rightTree.size();k++){
+        TreeNode *root = new TreeNode(i);
+        root->left = leftTree[l];
+        root->right = rightTree[k];
+
+      }
+    }
+  }
+
+----
+对应以上这个主题逻辑，是可以构造出所有的结果的，因此在此基础上，我们将结果进行缓存即可。
+
+=== 考察点
+树，根据第一题的分析进行灵活转换
+
+=== 代码实现
+----
+class Solution {
+public:
+    vector<TreeNode *> generateTrees(int n) {
+        //1-n轮流做跟节点
+        return create(1,n);
+    }
+    //创建树的数组  递归实现
+    vector <TreeNode*> create(int left,int right){
+        vector <TreeNode * >res;
+        if(left > right){
+            res.push_back(NULL);
+            return res;
+        }
+        for (int i=left;i<=right;i++){
+            //递归左右子树
+            vector <TreeNode *> leftTree = create(left,i-1);
+            vector <TreeNode *> rightTree = create(i+1,right);
+            //遍历子树将 不停的构建子树 想要求 树的总个数 其实就是拿左子树个数*右子树个数
+            for(int j=0;j<leftTree.size();j++){
+                for(int k=0;k<rightTree.size();k++){
+                    TreeNode * root = new TreeNode(i);
+                    root->left = leftTree[j];
+                    root->right = rightTree[k];
+                    res.push_back(root);
+                }
+            }
+
+        }
+        return res;
+    }
+
+};
+----
