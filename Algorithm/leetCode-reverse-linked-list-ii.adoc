@@ -1,0 +1,117 @@
+== reverse-linked-list-ii
+
+=== 题目描述
+----
+Reverse a linked list from position m to n. Do it in-place and in one-pass.
+For example:
+Given1->2->3->4->5->NULL, m = 2 and n = 4,
+return1->4->3->2->5->NULL.
+Note: 
+Given m, n satisfy the following condition:
+1 ≤ m ≤ n ≤ length of list.
+----
+
+=== 分析
+
+反转一个链表的某一部分（从ｍ到ｎ 1<=m <=n <=lenth）,并且要求只能在原链表进行，也就是说辅助空间只能是　Ｏ(1) 了。
+我们先来模拟一下这个过程
+
+----
+链表：A->B->C->D->E->F->G
+下标从1开始，m=3，n=6
+结果应该为：A->B->F->E->D->C->G
+翻转部分：C->D->E->F => F->E->D->C
+当然，如果我们用一个栈将需要翻转的部分放入，然后再从开始位置重新走一遍并将翻转部分用栈中弹出顺序替换即可。其实这是一个空间复杂度为O(n)的算法。
+如何再次优化，将O(n)变为O(1),其实一个关键点在于，栈需要一个入和出的过程。如果我们能够把C后的元素都看成待插入的元素，插入到C的前面，是否就可以解决了。
+我们来手工演示一下
+
+我们首先应该把 D放到 C的前面，然后把E放到D的前面，一次类推知道完成。
+
+我们将B定义为Pre节点，C 为 nodeBegin 节点，然后再定义一下 tmp 为空节点，我们演示一下D入和放到前面。
+
+1. 取出要插入的元素D
+2. 将 C的next 指向 D的next 
+3. 将 D的next 指向 B的next
+4. 将 B的next 指向 D
+   从1开始处理下一轮
+
+
+由于我们是单链表，所以，我们只能从前向后走，执行上述步骤也应该如此。
+tmp = nodeBegin->next;   //D
+nodeBegin->next = tmp->next  //C->next = D->next  [B->{C->E D->E}->F]
+tmp->next = pre->next        // D->next = B->next [{B->C D->C}->E->F]
+pre->next = tmp              // B->next = D       [B->D->C->E->F]
+
+pre = B,nodeBegin=C, 注意 此时nodeBegin->next 就是 E了，E->next 就为F了，元素没有变，但是他们的next 指向却变了，等于变相的就讲开始处理的位置后移了第二轮的变换顺序应该是这样的。
+B->D->C->E->F
+B->D->{C->F E->F}
+B->D->C->F{E->D}
+B->E->D->C->F 
+此时pre=B，nodeBegin = C 再来 一轮即将完成
+B->E->D->{C->G,F->G}
+B->E->D->C->G{F->E}
+B->F->E->D->C->G
+此时注意如果F是最后一个元素也是无所谓的，无非就是F->null,结果是一样，
+一共循环了三次，正好是n-m
+
+
+我们来完善一下核心代码：
+nodeBegin = head;
+diff = n-m;
+for (int i=1;i<m;i++){
+	pre = nodeBegin;
+	nodeBegin = nodeBegin->next
+}
+for (i=0;i<diff;i++){
+	tmp = nodeBegin->next;
+    nodeBegin->next = tmp->next;
+    tmp->next = pre->next;
+    pre->next = tmp;
+}
+
+----
+其实此题，经过以上分析，我们就可以很简单的实现，这个过程其实也是一个，分析带入的过程，当一眼看上去，熟悉又不知道该怎么去解答的时候，可以尝试手工去进行一遍带入，然后转换为代码即可。
+
+=== 考察点
+链表，前插法
+
+=== 代码实现
+
+----
+/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     ListNode *next;
+ *     ListNode(int x) : val(x), next(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    ListNode *reverseBetween(ListNode *head, int m, int n) {
+        if(head==NULL)
+            return NULL;
+        ListNode *dump = new ListNode(0);
+        dump->next = head;
+        ListNode *start = head;
+        ListNode *preStart = dump;
+        ListNode *tmpNode ;
+        int diff = n-m;
+        for(int i =1;i<m;i++){
+            preStart = start;
+            start = start->next;
+        }
+        for(int i=0;i<diff;i++){
+            //start->next 当前要移动的 元素
+            tmpNode = start->next;
+            //tmpNode->next 要移动的元素的下一个元素
+            start->next = tmpNode->next;
+            //preStart->next  指向start的元素
+            tmpNode->next = preStart->next;
+            //向前走一步
+            preStart->next = tmpNode;
+        }
+        return dump->next;
+    }
+};
+----
