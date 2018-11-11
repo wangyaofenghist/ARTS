@@ -1,0 +1,77 @@
+== subsets-ii
+
+=== 题目描述
+----
+Given a collection of integers that might contain duplicates, S, return all possible subsets.
+Note:
+Elements in a subset must be in non-descending order.
+The solution set must not contain duplicate subsets.
+
+For example,
+If S =[1,2,2], a solution is:
+[
+  [2],
+  [1],
+  [1,2,2],
+  [2,2],
+  [1,2],
+  []
+]
+
+----
+
+=== 分析
+给出一个有重复数字的集合，然后返回所有的子集，并且不重复。
+几个点
+1.有重复数字
+2.所有的子集
+3.要求子集不重复
+首先我们观察这道题，类似与一个递归问题，可以通过求解更小规模的解，然后得到最终解，用递归的话递归可以理解为，S的每一个位置我们都可以选择有或者没有，然后组合出所有的情况，用代码实现其实就是：选则当前位置的字符，递归的求更小的解，然后去除当前位置的字符，这就形成了回朔。
+----
+F:(s,start,list)
+  for(i=strt;i<s.size,i++){
+	list.push_back(s[i])
+    F(s,i+1,list)
+    list.pop_back	
+  }
+----
+也可以理解为暴力求解，枚举所有可能。如何解决子集不重复问题，其实很简单，对数组排序，在递归之前，判断当前字符是否与下一个相同，相同则跳过即可
+
+=== 考察点
+递归，回朔
+
+=== 代码实现
+
+----
+class Solution {
+public:
+    vector <vector <int>> res;
+    vector<vector<int> > subsetsWithDup(vector<int> &S) {
+        if(S.size()<=0)
+            return res;
+        vector <int > list;
+        int start = 0;
+        sort(S.begin(),S.end());
+        backTrack(S,start,list);
+        return res;
+    }
+    //回溯求解  1. 定义一个解的公共变量 2.定义回溯函数 参数一定有 元数组，需要求解的参数 
+    //函数内部 一定有一个循环，一个push+递归+pop 构造出回溯结构
+    void backTrack(vector <int> &S,int start,vector<int> list){
+        //要到是全部组合 所有只要有尝试就加入进来
+        res.push_back(list);
+        for(int i = start;i<S.size();i++){
+            //去重
+            if (i > start && S[i] == S[i - 1])
+                continue;
+            //添加一个元素
+            list.push_back(S[i]);
+            //开始递归 start 位置改变
+            backTrack(S,i+1,list);
+            //吐出元素形成回溯闭环
+            list.pop_back();
+        }
+        
+    }
+};
+----
