@@ -1,0 +1,147 @@
+== scramble-string
+=== 题目描述
+----
+Given a string s1, we may represent it as a binary tree by partitioning it to two non-empty substrings recursively.
+
+Below is one possible representation of s1 ="great":
+
+    great
+   /    \
+  gr    eat
+ / \    /  \
+g   r  e   at
+           / \
+          a   t
+To scramble the string, we may choose any non-leaf node and swap its two children.
+
+For example, if we choose the node"gr"and swap its two children, it produces a scrambled string"rgeat".
+
+    rgeat
+   /    \
+  rg    eat
+ / \    /  \
+r   g  e   at
+           / \
+          a   t
+We say that"rgeat"is a scrambled string of"great".
+
+Similarly, if we continue to swap the children of nodes"eat"and"at", it produces a scrambled string"rgtae".
+
+    rgtae
+   /    \
+  rg    tae
+ / \    /  \
+r   g  ta  e
+       / \
+      t   a
+We say that"rgtae"is a scrambled string of"great".
+
+Given two strings s1 and s2 of the same length, determine if s2 is a scrambled string of s1.
+----
+=== 分析
+
+给定一个字符串s1,我们可以通过将其递归的分为不为空的两部分，进而构造一棵二叉树。
+而我们选择任意一个非页节点，并对其子节点做交换。就比如  上图第一个 二叉树和第二个二叉树，此时我们称 rgeat 为 great的 “scrambled string”
+一直交换下去这些字符串都可以称为原始字符串（great）的 “scrambled string”。
+而本题让求的是两个字符串 s1 与 s2 符合 “scrambled string ”的关系，也就是说 s2 是可以 通过s1不断的进行此类的变换而形成 。
+
+这个问题首先想到的就是模拟这个变换过程，然后与目标字符串对比，但是瞬间感觉很复杂啊！因为本身拆成树就有好多种拆分方法，每个树还可以进行变换。
+复杂点在于你要把它所有的情况拆分成树，然后再变换，再对比。其实我们仔细观察，这个问题只是在借用二叉树来表述问题，其实我们只需要简单分割，然后比对
+也是可以的。因为如果 s1 能够通过 变换得到 s2 则，s1拆分为两部分[s1.1,s1.2] 则必然与 s2 拆分后的[s2.1,s2.2]存在某种关系（scrambled string）
+，我们假设 f(x,y) 标示 x,y 直接的关系为 “scrambled string ” ，则 （f(s1.1,s2.1) && f(s1.2,s2.2)）|| （f(s1.1,s2.2) && f(s1.2,s2.1）)
+满足条件为真，则f(s1,s2) 必为真。好像结果出来了，不停的分割，不停的递归求解，只要有一个符合，就为真。
+----
+
+for(int i=1;i<s1.length();i++)
+{
+    if(isScramble(s1.substr(0,i), s2.substr(0,i)) && isScramble(s1.substr(i), s2.substr(i)))
+        return true;
+    if(isScramble(s1.substr(0,i), s2.substr(s2.length()-i)) && isScramble(s1.substr(i), s2.substr(0,s2.length()-i)))
+        return true;
+}
+----
+同样我们可以把 f(x,y) 用 dp[k][x][y] 标示，表示意思为 长度为k 并从x的位置开始的s1，与长度为k，从y位置开始的s2 的字符符合条件。为什么多加了一个k
+因为上一中思路，我们是在递归，其实就是在将 s1，s2 按照不同的k进行拆分然后对比，而我们如果用动态规划自低向上，自然就要加上参数k，然后以循环代替递归了
+三维数组做动态规划，至少意味着三层循环，在第三层循环中我们如何表述 dp[k][x][y] 的值呢？我们应该遍历所有以k为长度的拆分，也就是 小于k 的所有组合
+从下标0开始标示长度1：
+dp[k][x][y] == (dp[q][x][y] && dp[k-q-1][x+q+1][y+q+1]) || dp[q][x][y+k-q] && dp[k-q-1][x+q+1][y]
+dp[0][x][y] == (s[x] == s[y])
+因为此数组必将对称，如: dp[q][x][y+k-q] == dp[q][x+k-q][y] 所以，不再需要更多的对比
+----
+for(int k=1;k<len1; k++){  //分割长度
+		for(int i=0; i<len1-k ;i++){ //s1
+			for(int j=0; j<len1-k; j++){//s2
+				if(false == dp[k][i][j]){
+					for(int q=0; q<k; q++){
+						if( (dp[q][i][j] && dp[k-q-1][i+q+1][j+q+1]) || (dp[q][i][j+k-q] && dp[k-q-1][i+q+1][j]) )
+							dp[k][i][j] = true;
+					}
+				}
+			}
+		}
+}
+
+----
+当然剩下的边界条件就都很简单了
+
+=== 考察点
+动态规划，递归
+
+=== 代码实现
+递归代码
+----
+class Solution {
+public:
+    bool isScramble(string s1, string s2) {
+        if(s1==s2) return true;
+        int v[26] = {0};
+        for(int i=0;i< s1.length();i++){
+            v[s1[i]-'a']++;
+            v[s2[i]-'a']--;
+        }
+        for(int i=0;i< 26;i++){
+            if (v[i] != 0)
+                return false;
+        }
+
+        for(int i=1;i<s1.length();i++){
+            if(isScramble(s1.substr(0,i),s2.substr(0,i)) && isScramble(s1.substr(i),s2.substr(i)) )
+                return true;
+            if(isScramble(s1.substr(0,i),s2.substr(s2.length()-i)) &&
+              isScramble(s1.substr(i),s2.substr(0,s2.length()-i)))
+                return true;
+
+        }
+        return false;
+    }
+};
+----
+动态规划
+----
+bool isScramble(string s1, string s2) {
+	int len1=s1.size(), len2=s2.size();
+	if(len1 != len2)
+		return false；
+  vector<vector<vector<bool> > > dp(len1, vector<vector<bool>>(len1,vector<bool>(len1,false)) );
+  //初始化数组，子串长度为一时，只要相等就是
+  for(int i=0; i<len1; i++){
+    for(int j=0; j<len1; j++){
+      if(s1[i] == s2[j])
+        dp[0][i][j] = true;
+    }
+  }
+  for(int k=1;k<len1; k++){
+    for(int i=0; i<len1-k ;i++){
+      for(int j=0; j<len1-k; j++){
+        if(false == dp[k][i][j]){
+          for(int q=0; q<k; q++){
+            if( (dp[q][i][j] && dp[k-q-1][i+q+1][j+q+1]) || (dp[q][i][j+k-q] && dp[k-q-1][i+q+1][j]) )
+              dp[k][i][j] = true;
+          }
+        }
+      }
+    }
+  }
+  return dp[len1-1][0][0];
+}
+----
