@@ -1,0 +1,122 @@
+== maximal-rectangle
+
+=== 题目描述
+----
+Given a 2D binary matrix filled with 0's and 1's, find the largest rectangle containing all ones and return its area.
+----
+
+=== 分析
+在一个2D的二进制平面模型中只包含 0 和 1，我们要找到一个有 1 组成的最大面积的长方形，我们来简单构造一个实例。
+
+----
+110100100
+010101000
+011110010
+101111010
+010110101
+----
+很明显最大的有 1 组成的 图形 是从 [3,3]~[4,5] 和 [3,4] ~ [5,5] 的位置，面积都为 6 （包含两个点）。
+我们来细化一下我们是如何找到这个结果的：(我们用 i 标示纵坐标"|" ,j标示 横坐标 “-”)
+
+我们先想办法将此题化解为 “largest-rectangle-in-histogram” ，此题的题意为 给定一个数组（A[n]），表示一个坐标系上条形图的高度，然后让我们求出，条形图所能构成的最大长方形面积。
+
+两道题的差别在于，一个是条形图，一个是矩阵，也就意味着，条形图不会在一个纵坐标上出现 上部分有条形图，下部分没有条形图，只可能出现下部分有上部分没有。那么如果我们将矩阵自上向下 从左到右 逐行读取的时候，每行向上取，然后构造出这个数组A[n]，不停的调用  largest-rectangle-in-histogram 题的解法即可得出结果。
+
+构造流程：
+----
+  vector<int> Array(n,0);
+  for(int i=0;i<m;i++){
+    for(int j=0;j<n;j++){
+      int up = i;
+      while(matrix[up][j] == '1'){
+        Array[j]++;
+        up--;
+      }
+    }
+  }
+----
+我们来看一下
+largest-rectangle-in-histogram 的解法
+A=[2,1,5,6,2,3]
+我们可以通过栈，进行计算，但是我们要考虑，只有当当前元素小于栈元素的时候去进行计算，则数组是递增的我们改如何处理，其实我们只需要在A后补加一个0即可让数组不是一直递增，就可以一直出栈了。
+----
+  for(int i=0;i<A.size();i++){
+    while(!stackA.empty() && A[stackA.top()] >=A[i]){
+      int height = A[stackA.top()];
+      s.pop();
+      int left = stackA.empty()?-1:stackA.top();
+      int w = i-left-1;
+      result = max(result,w * height)
+    }
+    stackA.push(i);
+  }
+----
+也可以通过一层循环进行处理
+----
+        for(int i=0;i<A.size();){
+            if(stackA.empty() || A[i]>=A[stackA.top()] ){
+                stackA.push(i);
+                i++;
+            }else{
+                temp = stackA.top();
+                stackA.pop();
+                int w = stackA.empty() ? i : i - stackA.top() -1;
+                resultNew = w *height[temp];
+                result = max(result,resultNew);
+            }
+
+        }
+----
+
+其实这里体现了一种贪婪算法，每次选择，都选择最大的，取到以每行为x轴的最优解，不停的推进并淘汰，同时，每一次求解也是一次贪婪选择，只贪大数，注意咱们求每次的解的时候for循环是只有入栈之后才会 i++ ,也就是说只要
+
+=== 考察点
+贪婪
+=== 代码实现
+----
+class Solution {
+public:
+    int maximalRectangle(vector<vector<char> > &matrix) {
+        int ret = 0;
+        if(matrix.empty() || matrix[0].empty()){
+            return ret;
+        }
+        int m = matrix.size();
+        int n = matrix[0].size();
+
+        for(int i=0;i<m;i++){
+            vector <int> temp(n,0);
+            //找到第i行 j 列 为1 的最大高度
+            for(int j=0;j<n;j++){
+                int r = i;
+                while(r>=0 && matrix[r][j]=='1'){
+                    temp[j]++;
+                    r--;
+                }
+            }
+            ret = max(ret,largestRectangleArea(temp));
+
+        }
+        return ret;
+    }
+
+    //根据每一行的高度值，算出最大面积
+    int largestRectangleArea(vector <int> & heights){
+        //多给一个0，避免数组一直递增
+        heights.push_back(0);
+        int result = 0;
+        stack<int> s;
+        for(int i = 0; i < heights.size(); ){
+            if(s.empty() || heights[i] >= heights[s.top()]){
+                s.push(i);
+                i++;
+            }else{
+                int temp = s.top();
+                s.pop();
+                result = max(result, (s.empty() ? i : i-s.top()-1) * heights[temp]);
+            }
+        }
+        return result;
+    }
+};
+----
