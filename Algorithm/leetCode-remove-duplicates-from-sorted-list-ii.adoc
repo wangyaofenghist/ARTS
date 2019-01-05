@@ -1,0 +1,81 @@
+== remove-duplicates-from-sorted-list-ii
+
+=== 题目描述
+----
+Given a sorted linked list, delete all nodes that have duplicate numbers, leaving only distinct numbers from the original list.
+
+For example,
+Given 1->2->3->3->4->4->5, return 1->2->5.
+Given 1->1->1->2->3, return 2->3.
+
+----
+
+=== 分析
+给定一个顺序链表，要求剔除里面有重复的元素，如给出的 两个实例
+----
+Given 1->2->3->3->4->4->5, return1->2->5.
+Given 1->1->1->2->3, return2->3.
+----
+这两个实例至少告诉我们 1. 重复的元素是全部剔除一个不保留  2. 首元素重复同样剔除
+
+所以 假设给到我们的链表 为 head ，则 我们应该先来一个伪节点，preHead 指向它（preHead->next = head ）并且最后返回结果应该就是preHead->next
+我们可以通过两个相邻指针（A，B）同时后移判断相邻两个元素是否相同，如果相同（A=B），则记录B应该一直后移，知道找到不相同的节点，此时关键点是如何让A
+的上一个元素指向B（此时B已经是不重复的元素了），由于我们是链表，所以我们可以用cur 标示当前 节点，cur->next 标示A 指针，cur->next->next 标示B
+当相同是，直接 B=B->next 后移到 B!=A 的位置，让cur->next = B 即可。我们用伪代码描述一下
+
+----
+preHead = new ListNode(head->val - 1);
+preHead->next = head;
+listNode *cur = preHead;
+listNode *p,*pNext ;   //A,B
+while(cur->next && cur->next->next ){
+  p = cur->next;
+  pNext = p->next;
+  //发现相等元素
+  if (p->val == pNext->val){
+     while(pNext && p->val==pNext->val){
+       pNext = pNext->next;
+     }
+     cur->next = pNext;
+  }else{
+    cur = cur->next;
+  }
+}
+return preHead->next;
+----
+
+=== 考察点
+链表
+
+=== 代码
+----
+class Solution {
+public:
+    ListNode *deleteDuplicates(ListNode *head) {
+        if(head == NULL){
+            return head;
+        }
+        //首先要找到第一个非重复的节点作为头结点，
+        //直接找比较麻烦，可以添加一个新结点preHead作为伪头结点，
+        //最后返回preHead->next即可。
+        ListNode *preHead = new ListNode(head->val-1);
+        preHead->next = head;
+        ListNode *cur = preHead;
+        ListNode *p,*pNext ;
+        while(cur->next && cur->next->next){
+            p = cur->next;
+            pNext = p->next;
+            //如果值相同，则一直找到第一个不相同的值 并将cur->next 指向
+            if(p->val == pNext->val){
+                while(pNext && p->val == pNext->val)
+                    pNext = pNext->next;
+                cur->next = pNext;
+            }else{
+                //值不同
+                cur = cur->next;
+            }
+        }
+        return preHead->next;
+    }
+};
+----

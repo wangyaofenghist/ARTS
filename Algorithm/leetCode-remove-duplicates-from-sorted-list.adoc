@@ -1,0 +1,56 @@
+== remove-duplicates-from-sorted-list
+
+=== 题目描述
+
+----
+Given a sorted linked list, delete all duplicates such that each element appear only once.
+
+For example,
+Given 1->1->2, return 1->2.
+Given 1->1->2->3->3, return 1->2->3.
+----
+
+=== 分析
+给定一个有序列表，重复元素之保留一个，踢掉其余重复的元素。
+题目不难，两个相邻指针，如果相同，则后指针一直向后走知道不同，前指针的next 指向新节点。如果不同，同时向后移动。
+----
+ListNode *p = head;
+while (p !=Null) {
+  while (p->next != Null && p->val == p->next->val){
+    p->next = p->next->next;
+  }
+  p = p->next;
+}
+return head;
+----
+
+=== 考察点
+链表
+
+=== 代码
+----
+/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     ListNode *next;
+ *     ListNode(int x) : val(x), next(NULL) {}
+ * };
+ */
+class Solution {
+public:
+    ListNode *deleteDuplicates(ListNode *head) {
+        if(head == NULL)
+            return head;
+        ListNode *p=head;
+        while(p!=NULL ){
+            //直接将中间节点舍弃
+            while (p->next != NULL && p->val == p->next->val){
+                p->next=p->next->next;
+            }
+            p = p->next;
+        }
+        return head;
+    }
+};
+----
