@@ -1,0 +1,103 @@
+== subsets
+=== 题目描述
+----
+Given a set of distinct integers, S, return all possible subsets.
+
+Note:
+
+Elements in a subset must be in non-descending order.
+The solution set must not contain duplicate subsets.
+
+For example,
+If S =[1,2,3], a solution is:
+
+[
+  [3],
+  [1],
+  [2],
+  [1,2,3],
+  [1,3],
+  [2,3],
+  [1,2],
+  []
+]
+----
+
+=== 分析
+给定一个数字型的数组 S，返回所有的子数组，要求子集必须升序排列，并且不能重复。
+先想一想如果我们现在不求 S的所有子数组，我们只求基于 S 长度 为0，1，2，3 ... n 的子数组，并将这些结果合并，是否就是所求。这样我们的问题就演化
+成了求基于数组 S，长度为 i 的排列组合情况。
+
+我们可以通过入栈出栈来模拟，从S个数中，每个数选中与不选择的组合，遍历所有的组合即可,这其实是一个递归过程，从S中找到n长度的组合，等于从S中找到
+n-1 长的组合，加上当前元素即可，很明显这是一个递归。
+
+----
+vector <vector <int >> res;
+
+void subsetsArray(vector<int> s,int start,int len,venctor<int> list){
+  if (len<0){
+    return ;
+  }
+  //已经符合条件
+  if (len == 0 ){
+    res.push_back(list)
+  }else{
+    for (int i= start ;i<s.size();i++){
+      list.push_back(s[i]);  //标示选中 s[i]
+      subsetsArray（s,i+1,len-1,list）;
+      list.pop_bock(); //标示 舍弃 s[i]
+    }
+  }
+}
+----
+
+我们在看一下全排列应该如何取写
+
+----
+void permutations(vector<int>s,int start,int end){
+  if (start  == end){
+    res.push_back(list)
+  }else{
+    for (int i = start;i<end ;i++){
+      swap(list[k],list[i]);
+      permutations(list,k+1,m);
+      swap[list[k],list[i]];
+    }
+  }
+}
+----
+指的注意的是 全排列是用的 swap 函数，其实是可以改写为 push_back的，但是需要注意，如果改写成 入栈出栈，则 内部for 循环需要从 0开始，并且
+跳过已经入栈的元素。
+
+=== 考察点
+排列组合
+=== 代码
+----
+class Solution {
+public:
+    vector <vector <int >> res;
+    vector<vector<int> > subsets(vector<int> &S) {
+        vector <int > tmp;
+        sort(S.begin(),S.end());
+        //将 大任务化小
+        for(int i=0;i<=S.size();i++){
+            subsetsArray(S,0,i,tmp);
+        }
+        return res;
+    }
+    //求某一个字符串长度为 len 下的组合情况
+    void subsetsArray(vector<int> s,int start,int len,vector<int> list){
+        if(len <0)
+            return ;
+        if(len == 0){
+            res.push_back(list);
+        }else{
+            for(int i=start ;i <s.size();i++){
+                list.push_back(s[i]);
+                subsetsArray(s,i+1,len-1,list);
+                list.pop_back();
+            }
+        }
+    }
+};
+----

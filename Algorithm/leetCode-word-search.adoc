@@ -1,0 +1,94 @@
+== word-search
+=== 题目描述
+----
+Given a 2D board and a word, find if the word exists in the grid.
+
+The word can be constructed from letters of sequentially adjacent cell, where "adjacent" cells are those horizontally
+or vertically neighboring. The same letter cell may not be used more than once.
+
+For example,
+Given board =
+
+[
+  ["ABCE"],
+  ["SFCS"],
+  ["ADEE"]
+]
+word ="ABCCED", -> return true,
+word ="SEE", -> return true,
+word ="ABCB", -> return false.
+----
+
+=== 分析
+从二维的模板中得到一个单词，判断单词是否存在于表格之中。
+这个单词可以有顺序相邻的单元格字符构成，相邻是指水平或垂直相邻，每个单元格只使用一次。
+我们看实例，如何找到 “ABCCED” 在board中，第一行可以读出 ABC 向下 C 在向下 E 向左 D  ，和提供的字符串完全相符合，返回true
+
+我们抽象一下这个寻找 字符串的过程，其实就是从 第一个位置 （0，0）A 开始判断，是否符合第一个字符 A（BCCED），如果符合，开始探测上下左右，并寻找
+第二个字符[A]B（CCED），向下一步走,重复这个过程，直到不符合，然后回到上一步，接着寻找另外的可能（就是穷举四个方向）。直到找到一条这样的路径（true），或者找不到
+（false）。
+
+最外层，我们只需要 从 （0，0） ~ （n,m） 不停的以其中一点当做起点，去探测即可
+
+我们尝试写出主逻辑，这是一个深度遍历的过程。
+----
+//r = rows c=cols step 记录走了多少步
+bool DFS(vector<vector<char>> board,int r,int c,string word,int step){
+  if (start >= word.size())
+    return true;
+  //isOut 判断是否越界
+  if (isOut(r,c,board.size(),board[0],size()) || word[step]!=board[r][c])
+    return false;
+  //下，上，右，左
+  int dx[] = {0,0,1,-1};
+  int dy[] = {1,-1,0,0};
+  char tmp = board[r][c];
+  board[r][c] = '.';
+  //四个方位进行探测
+  for(int i=0;i<4;i++){
+    if(DFS(board,r+dx[i],c+dy[i],word,step+1))
+      return true;
+  }
+  board[r][c] = tmp;
+  return false;
+}
+----
+=== 考察点
+深度遍历
+=== 代码
+----
+class Solution {
+public:
+    bool exist(vector<vector<char> > &board, string word) {
+       int rows = board.size(),cols = board[0].size();
+        for(int r = 0;r<rows ;r++){
+            for(int c = 0;c<cols;c++){
+                if(board[r][c] == word[0] && DFS(board,r,c,word,0)){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    bool DFS(vector<vector<char> >board,int r, int c, string &word,int start){
+        if(start >= word.size())
+            return true;
+        if(isOut(r,c,board.size(),board[0].size()) || word[start] != board[r][c])
+        {
+            return false;
+        }
+        int dx[] ={0,0,1,-1},dy[] = {1,-1,0,0};
+        char tmp = board[r][c];
+        board[r][c] = '.';
+        for(int i=0;i<4;i++){
+            if(DFS(board,r+dx[i],c+dy[i],word,start+1))
+                return true;
+        }
+        board[r][c] = tmp;
+        return false;
+    }
+    bool isOut(int r,int c, int rows,int cols){
+        return c<0 || c>=cols || r<0 || r>= rows;
+    }
+};
+----
