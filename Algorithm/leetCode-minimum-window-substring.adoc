@@ -1,0 +1,94 @@
+== minimum-window-substring
+
+=== 题目描述
+----
+
+Given a string S and a string T, find the minimum window in S which will contain all the characters in T in complexity O(n).
+
+For example,
+S ="ADOBECODEBANC"
+T ="ABC"
+
+Minimum window is"BANC".
+
+Note:
+If there is no such window in S that covers all characters in T, return the emtpy string"".
+
+If there are multiple such windows, you are guaranteed that there will always be only one unique minimum window in S.
+----
+
+=== 分析
+给定一个字符串S和T，从S中找出最小的一段字符，使其能够包含T中的所有字符串，并且期望这个过程时间复杂度为O(n),如果找不到则返回 空字符串 （""）
+如果存在多个则要保证返回的长度最小。
+
+这个题用常规方法还真有点麻烦，因为这里存在一个顺序问题，所以我们如果用常规算法只能用双重循环，对每一位都进行一个匹配，并且记录T中的符号是否都匹配完成了，完成后开始下一轮。如果我们能够把这个内循环给去掉，是否就可以从n*n 变为 n了。什么数据结构可以将O（n）变为 O（1）=》hash，map，list。
+我们将T中的每一位元素作为下标，构造一个map<char,int> 的数据，初始化每个元素的值（通过++，以防止有重复元素不能直接初始化为1）.然后我们假设有两个指针同时指向了开头位置（i，j），一个向后移动找寻T中的元素（j），此时我可以在O(1) 的时间复杂度内判断是否是在T中的元素，是并且大于0，则减去1。直到所有的T对应map值都为0了（可以通过另外的一个变量进行标示），另一个指针开始从前向后走（i），碰到T中的元素就让map对应值加1，然后j指针接着后移，再次过程中记录最小的长度和起点位置。直到走完。整个过程时间复杂度为O（n）
+我们分别来实现以上几个过程
+
+----
+//初始化T对应的map
+map<char,int> tmp;
+for (int i=0;i<T.size();i++){
+  tmp[T[i]] ++ ;
+}
+//定义两个指针（就是位置标志）
+int begin=0,end = 0;
+//定义长度标示
+int winLen = INT_MAX;
+//定义起点标示
+int head=0;
+//定义的T的长度的变量，其实就是tmp的总和
+int Tlen = T.size();
+//设定边界，end 下标必须小于S的长度
+while(end <S.size()){
+  if(tmp[S[end++]]-- > 0)
+    Tlen --;
+  //记录最长长度，并且开始收缩 begin
+  while(Tlen ==0 ){
+    if(end-begin < winLen){
+      head = begin;
+      winLen  = end - head;
+    }
+    if（tmp[S[begin++]]++ == 0）
+      Tlen ++;
+  }
+}
+return winLen == INT_MAX ? "":S.substr(head,winLen);
+----
+
+=== 考察点
+贪心，窗口思想
+
+=== 代码实现
+----
+class Solution {
+public:
+    string minWindow(string S, string T) {
+        map<char,int> tmp;
+        for(int i=0;i<T.size();i++){
+            tmp[T[i]]++;
+        }
+        int begin = 0,end = 0;
+        int winLen = INT_MAX;
+        int Tlen = T.size();
+        int head = 0;
+        while(end <S.size()){
+            if(tmp[S[end++]]-- > 0){
+                Tlen --;
+            }
+            while(Tlen==0){
+                if(end -begin <winLen){
+                    head = begin;
+                    winLen = end - head;
+
+                }
+                if(tmp[S[begin++]]++ == 0){
+                    Tlen ++;
+                }
+            }
+        }
+        return winLen == INT_MAX ? "":S.substr(head,winLen);
+
+    }
+};
+----
