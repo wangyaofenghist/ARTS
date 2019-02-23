@@ -1,0 +1,85 @@
+== simplify-path
+
+=== 题目描述
+----
+Given an absolute path for a file (Unix-style), simplify it.
+
+For example,
+path ="/home/", =>"/home"
+path ="/a/./b/../../c/", =>"/c"
+
+click to show corner cases.
+
+Corner Cases:
+
+Did you consider the case where path ="/../"?
+In this case, you should return"/".
+Another corner case is the path might contain multiple slashes'/'together, such as"/home//foo/".
+In this case, you should ignore redundant slashes and return"/home/foo".
+----
+
+=== 分析
+其实也就是给定了一个绝对路径（以 / 开头），让我们转换为一个简化过的路径，因为在linux 中 . 标示当前目录，.. 标示 上级目录，所以我们最主要的目的
+就是讲 路径中的 . 和 .. 包括最后的 / 给去除掉 。
+假设我们 按照 / 分割 path，去除两个 / 中的数据  p，
+if p== "."
+   //舍弃 不做任何处理
+else if p== ".."
+  //退回上级目录
+else
+  //标示正常的目录，应该入栈 （栈有pop与push 正好满足退回上级目录的操作）
+
+最后将结果出栈，并 用 / 分割，如果栈为空，应该范围 /
+
+如何查找 两个 / 之间的值
+
+while (i<len && path[i]=="/") i++;
+p = "";
+while(i<len && path[i] != "/") {
+  p += path[i];
+  i++;
+};
+
+=== 考察点
+字符串，栈
+
+=== 代码
+----
+class Solution {
+public:
+    string simplifyPath(string path) {
+        int len = path.size();
+        int pre = -1;
+        stack <string> tmp;
+        string res="";
+        for(int i=0;i<len;i++){
+            //将i定位到 非 / 的第一个位置
+            while(i<len && path[i]=='/')i++;
+            //如果i越界 直接 退出循环
+            if(i == path.size()) break;
+            string p;
+            //直到找到 未越界 的范围内  下一个 / 处 将中间字符合并
+            while(i<path.size() && path[i]!='/'){
+                p +=  path[i];
+                i++;
+            }
+            //如果等于 . 忽略
+            if(p == ".") continue;
+            //如果等于 .. 并且栈不为空 出栈 不为 .. 入栈
+            if(p == ".."){
+                if(!tmp.empty())
+                    tmp.pop();
+            }else{
+                tmp.push(p);
+            }
+        }
+        //读取 栈中的内容，不停的出栈
+        while(!tmp.empty()){
+            res = "/"+tmp.top()+res;
+            tmp.pop();
+        }
+        //判断如果出栈有数据，返回数据，否则 返回 /
+        return res==""? "/": res;
+    }
+};
+----
