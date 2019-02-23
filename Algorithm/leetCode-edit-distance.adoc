@@ -1,0 +1,84 @@
+== edit-distance
+
+=== 题目描述
+
+----
+Given two words word1 and word2, find the minimum number of steps required to convert word1 to word2. (each operation is counted as 1 step.)
+
+You have the following 3 operations permitted on a word:
+
+a) Insert a character
+b) Delete a character
+c) Replace a character
+----
+
+=== 分析
+给出两个词 word1 和 word2 ，求将 word1 变为 word2 所需的最小步数（每一个操作都算一步），可以做 插入，删除，替换三种操作。
+其实也就是说 word1 上的 每一位都可以通过一步变为 word2 中的对应位的值。也就是说 word2 有多长，最多就需要几步即可。但是此处需要求的是最小
+假设word1 的长度为 m,word2 的长度为n,我们有一个数组dp[m][n] 标示 word1 到 m 的位置，变化为 word 到n 的位置需要几步，则 可知
+1. dp[m][0] = m  //word1 长度为0，则word1 的长度即为步骤数
+2. dp[0][n] = n  //word2 的长度为0，则word2的长度即为步骤数
+3. dp[x][y] = min(min(dp[x-1][y],dp[x][y-1]),dp[x-1][y-1])+1   //当 word1[x] != word2[y]
+4. dp[x][y] = dp[x-1][y-1]    //当 word1[x] == word2[y]
+
+也就是说，我们可以从 word2 长度等于 0，word1 长度等于 0 ，word1[x] == word2[y] ，word1[x] ！= word2[y]  推导出 四个状态转换式，并且
+得知 1，2 是可以直接计算，3，4 依赖于 前边的计算结果，所以这是一个典型的动态规划。 dp[m][n] 即为所求
+大致伪代码为：
+
+----
+  for （i=0;i<len(word1);i++）{
+    dp[i][0] = i;
+  }
+  for (j = 0;j<len(word2);j++){
+    dp[0][j] = 0;
+  }
+  for(i=1;i<len(word1);i++){
+    for(j=1;j<len(word2);j++){
+      if(word1[i] == word2[j]){
+        dp[i][j] = dp[i-1][j-1]
+      }else{
+        dp[i][j] = min(min(dp[i-1][j],dp[i][j-1]),dp[i-1][j-1])+1
+      }
+    }
+  }
+----
+
+=== 考察点
+动态规划
+
+
+=== 代码
+
+----
+class Solution {
+public:
+    //动态规划  dp[i][j] 标示 word1 从 0-i 变为 word2 从 0-j 需要多少步
+    int minDistance(string word1, string word2) {
+        if(word1.size() == 0 )
+            return word2.size();
+        if(word2.size() == 0)
+            return word1.size();
+        //初始化dp 每一位都为 0
+        vector<int> li(word2.size()+1,0);
+        vector <vector <int>> dp( word1.size()+1,li);
+        //初始化 dp[i][0] = i 标示 如果word2 为空的时候，从word1 i =》0 需要 i步
+        for(int i=1;i<=word1.size();i++)
+            dp[i][0] = i;
+        //初始化 dp[0][j] =j  标示 如果word1 为空 ，从 word1 为 0 变为 word2 的j 需要j步
+        for(int j=1;j<=word2.size();j++)
+            dp[0][j] = j;
+        //行列均从1 开始
+        for(int i=1;i<=word1.size();i++){
+            for(int j=1;j<=word2.size();j++){
+                //动态规划最核心的公式
+                if(word1[i-1] == word2[j-1])
+                    dp[i][j] = dp[i-1][j-1];
+                else
+                    dp[i][j] = min(min(dp[i-1][j],dp[i][j-1]),dp[i-1][j-1])+1;
+            }
+        }
+        //返回结果
+        return dp[word1.size()][word2.size()];
+    }
+};
+----
