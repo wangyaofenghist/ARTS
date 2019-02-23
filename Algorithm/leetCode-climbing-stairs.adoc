@@ -1,0 +1,39 @@
+== climbing-stairs
+
+=== 题目分析
+----
+You are climbing a stair case. It takes n steps to reach to the top.
+
+Each time you can either climb 1 or 2 steps. In how many distinct ways can you climb to the top?
+----
+
+=== 分析
+爬楼梯问题，有n阶台阶，你每次可以选择怕一阶或者两阶，总共有多少种爬楼方案。
+回想一下斐波那契数列，其实是一样的。
+
+我们可以通过动态规划来进行处理
+转换方程为
+
+1. dp[0] = 0                // i= 0
+2. dp[1] = 1                // i= 1
+3. dp[i] = dp[i-1]+dp[i-2]  //i>1
+
+=== 考察点
+动态规划
+
+=== 代码
+
+----
+class Solution {
+public:
+    int climbStairs(int n) {
+        vector<int > dp(n+1,0);
+        dp[0] = 1;
+        dp[1] = 1;
+        for(int i=2;i<=n;i++){
+            dp[i] = dp[i-1]+dp[i-2];
+        }
+        return dp[n];
+    }
+};
+----
