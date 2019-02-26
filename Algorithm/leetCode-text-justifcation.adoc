@@ -1,0 +1,118 @@
+== text-justifcation
+=== 题目描述
+----
+Given an array of words and a length L, format the text such that each line has exactly L characters and is fully (left and right) justified.
+
+You should pack your words in a greedy approach; that is, pack as many words as you can in each line. Pad extra spaces' 'when necessary so that each line has exactly L characters.
+
+Extra spaces between words should be distributed as evenly as possible. If the number of spaces on a line do not divide evenly between words, the empty slots on the left will be assigned more spaces than the slots on the right.
+
+For the last line of text, it should be left justified and no extra space is inserted between words.
+
+For example,
+words:["This", "is", "an", "example", "of", "text", "justification."]
+L:16.
+
+Return the formatted lines as:
+
+[
+   "This    is    an",
+   "example  of text",
+   "justification.  "
+]
+
+Note: Each word is guaranteed not to exceed L in length.
+
+click to show corner cases.
+
+Corner Cases:
+
+A line other than the last line might contain only one word. What should you do in this case?
+In this case, that line should be left-justified.
+
+
+----
+
+
+=== 分析
+给定一个包含单词的数组，和一个数字L，格式化每一行，使每一行的字符个数为L并且左右对齐，每一行应该尽可能多的包含单词，不足用空格填充。单词中间的额外添加的
+空格应该尽可能的均匀。最后一行应该是左对齐，并且没有多余空格填充的。
+
+从题意中我们可知几个信息
+1. 单词之间可以填充空格，每行的字符个数应该为L （单词不可拆分）
+2. 最后一行不填充多余空格，只是左对齐。其余行应该尽量左右对齐，分割均匀
+
+我们看一下根据以上信息，我们如何解题。
+
+1. 我们可以计算出某一行正常（单词长度 + 1空格  第一个单词除外）应该放几个单词 如果某个单词放入后整体长度超过 L意味着应该放到下一行
+2. 我们应该判断当前是否已经到了最后一行，如果到了 就正常输出 ，如果没有到 我们应该计算出 应该填入多少个空格，和一共有多少个单词间隙（槽）需要填充
+然后我们就可以计算一个槽填几个空格，并填充
+3. 将结果记录，并从下一个开始位置继续 1、2 步骤，直到完成。
+
+根据以上分析我们不难写出一段伪代码
+
+----
+while (i<len(words)) {
+  int j=i+1;
+  for(;j<wordLen && len+1+words[j].size()<=L;j++){
+      len += 1+words[j].size();
+  }
+  if(j==wordLen){
+      // 最后一行逻辑
+  }else{
+      // 其余行逻辑
+  }
+}
+----
+
+=== 考察点
+字符串、模拟
+
+=== 代码
+----
+class Solution {
+public:
+    vector<string> fullJustify(vector<string> &words, int L) {
+        //这个题主要是一个模拟过程
+        vector <string> list ;
+        int wordLen = words.size();
+        int i=0;
+        while(i<wordLen){
+            int len = words[i].size();
+            string line = words[i];
+            int j=i+1;
+            for(;j<wordLen && len+1+words[j].size()<=L;j++){
+                len += 1+words[j].size();
+            }
+            //说明是最后一行
+            if(j==wordLen){
+                for(int k=i+1;k<wordLen;k++){
+                    line +=" " +words[k];
+                }
+                while(line.size()<L){
+                    line += " ";
+                }
+            }else{
+                int white = L-len;//多余空格
+                int slot = j-i-1;//单词之间的槽数
+                if(slot==0){  //只有一个单词
+                    while(line.size()<L)
+                        line+=" ";
+                }else{
+                    for(int k=i+1;k<j;k++){
+                        line += " ";
+                        for(int m=0;m<white/slot;m++)
+                            line += " ";
+                        if(k-i<=white % slot)
+                            line += " ";
+                        line += words[k];
+                    }
+                }
+            }
+            list.push_back( line );
+            i=j;
+        }
+        return list;
+    }
+};
+----
