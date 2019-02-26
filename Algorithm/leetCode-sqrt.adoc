@@ -1,0 +1,45 @@
+== sqrt
+=== 题目描述
+----
+Implement int sqrt(int x).
+
+Compute and return the square root of x.
+----
+
+=== 分析
+求平方根，给定一个int类型的值x，返回x的正平方根。
+1. x 的算术平方根，一定是小于x的，可以从 0 ~ x 一个一个的试，从中间值开始
+2. 牛顿逼近法
+
+=== 考察点
+分治
+
+=== 代码
+----
+class Solution {
+public:
+    //分治
+    int sqrt(int x) {
+        int low =0;
+        int high = x;
+        while(low <= high){
+            long mid = (low+high)/2;
+            if(mid*mid == x)
+                return (int)mid;
+            if(mid*mid <x)
+                low = (int)(mid+1);
+            else
+                high = (int)(mid-1);
+        }
+        return high;
+    }
+    //牛顿逼近法
+    int sqrt2(int x) {
+        long tmp = x;
+        while(tmp*tmp > x){
+            tmp = (tmp+x/tmp)/2;
+        }
+        return tmp;
+    }
+};
+----
