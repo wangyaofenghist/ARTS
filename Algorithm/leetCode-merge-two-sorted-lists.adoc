@@ -1,0 +1,64 @@
+== merge-two-sorted-lists
+
+=== 题目描述
+----
+Merge two sorted linked lists and return it as a new list. The new list should be made by splicing
+together the nodes of the first two lists.
+----
+
+=== 分析
+给定两个已排序的链表，将两个链表进行合并，新链表应该通过拼接节点来完成（不要用全新链表）
+我们来模拟一下
+l1:  1->3->5->7->9
+l2:  2->4->6->8
+
+我们合并完成之后应该是
+1->2->3->4->5->6->7->8->9
+
+我们可以将链表中next一段线，元素当成一个个要串起来的东西，我们只需要用一个指针来不停的在l1、l2直接穿梭，将一段一段的线
+与元素连接起来就是合并后的结果。
+判断条件为：
+----
+if（l1->val <=l2->val）{
+  //串l1
+  l1 = l1->next
+}else{
+  //串l2
+  l2 = l2->next
+}
+----
+
+
+=== 考察点
+链表
+
+=== 代码
+
+----
+class Solution {
+public:
+    ListNode *mergeTwoLists(ListNode *l1, ListNode *l2) {
+        //设定一个新的头
+        ListNode *head = new ListNode(0);
+        //设定一个指针（类似于针去穿插的指向两个链表）
+        ListNode *p = head;
+        while(l1!=NULL && l2!=NULL){
+            if(l1->val <= l2->val){
+                p->next = l1;
+                l1 = l1->next;
+            }else{
+                p->next = l2;
+                l2 = l2->next;
+            }
+            p = p->next;
+        }
+        if(l1!=NULL){
+            p->next = l1;
+        }
+        if(l2!=NULL){
+            p->next = l2;
+        }
+        return head->next;
+    }
+};
+----

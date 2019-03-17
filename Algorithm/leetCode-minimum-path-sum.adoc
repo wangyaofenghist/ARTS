@@ -1,0 +1,60 @@
+== minimum-path-sum
+
+=== 题目描述
+
+----
+
+Given a m x n grid filled with non-negative numbers, find a path from top left to bottom right which minimizes
+the sum of all numbers along its path.
+
+Note: You can only move either down or right at any point in time.
+----
+
+=== 分析
+给定一个 m*n 的数字表格，找到一条从左上角到右下角的路经，使其路径上的和累加之后最小，求最小值，只能向下、右走
+
+注意最后求的是最小值，典型的一个动态规划
+只需要计算从左上角到右下角，每个单元格累加上下[i+1]、右[j+1] 的值，求最小即可。
+反过来想，如果我们从 [1,1] 开始计算，只需要每个单元格 加上最小的上[i-1]、左[j-1]，求最小值即可
+那么初始化就应该计算上，左两条边的初值
+----
+for（int i=1;i<m;i++）{
+  tmp[i][0] += tmp[i-1][0]
+}
+for (int j=1;j<n;j++) {
+  tmp[0][j] += tmp[0][j-1]
+}
+----
+此题可以在给定的 grid 上直接进行动态规划，因为要的是最后的最小值，[m-1,n-1] 即为所求
+
+=== 考察点
+动态规划
+
+=== 代码
+
+----
+class Solution {
+public:
+    int minPathSum(vector<vector<int> > &grid) {
+        //行
+        int m = grid.size();
+        //列
+        int n = grid[0].size();
+        //初始化行
+        for(int i=1;i<m;i++){
+            grid[i][0]+=grid[i-1][0];
+        }
+        //初始化列
+        for(int j =1;j<n;j++){
+            grid[0][j] += grid[0][j-1];
+        }
+        //从【1，1】开始，每次都去最小的 左和上 与当前累加
+        for(int i=1;i<m;i++){
+            for(int j=1;j<n;j++){
+                grid[i][j]+=min(grid[i-1][j],grid[i][j-1]);
+            }
+        }
+        return grid[m-1][n-1];
+    }
+};
+----
