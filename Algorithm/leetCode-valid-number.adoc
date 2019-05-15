@@ -1,0 +1,84 @@
+== valid-number
+
+=== 题目描述
+----
+Validate if a given string is numeric.
+
+Some examples:
+"0"=>true
+" 0.1 "=>true
+"abc"=>false
+"1 a"=>false
+"2e10"=>true
+
+Note: It is intended for the problem statement to be ambiguous. You should gather all requirements up
+front before implementing one.
+----
+
+=== 分析
+其实就是给定一个string 类型的数据，判断这个数据是否为有效的数字类型。
+这就涉及到数字类型的描述了：
+1. 0.1 这种小数属于数字类型
+2. 2e10 ，2e-10这种科学计数[2*10^(10) 、 2×10^(-10)]属于数字类型
+3. 0,1,222，-100.1 这种整型属于数字
+4. -10.2e-3   属于数字
+我们需要有几个标志位来标示是否出现过 数字，小数点，指数，以及e后边是否有数字 四个标志
+     * boolean pointSeen = false;//是否出现过小数点“.”
+     * boolean eSeen =alse;//是否出现过指数标志“e”
+     * boolean numberSeen = false;//是否出现过数字
+     * booleannumberAfterE = true;//e后面是否有数字
+我们总结一下
+1. 首先字符串前后空格去除
+2. 开始循环判断字符
+   1. 如果属于[0-9],numberSeen设置为true
+   2. 如果是 “.” ，必须之前没有遇到过 . 和 e
+   3. 如果是 “e”，必须之前没有遇到过e
+   4. 如果是 +、- ,当前位置i==0或者 i-1上为e
+   5. 其余返回 false
+3. 循环结束后 numberSeen && booleannumberAfterE 就是最终结果
+
+=== 考察点
+字符串，对数字的定义
+
+=== 代码
+----
+  bool isNumber(const char *s) {
+       int start=0,len=strlen(s)-1;
+       //去除左边空格（选定开始位置）
+       for(;start<len;){
+           if(s[start]!=' ')
+               break;
+           start++;
+       }
+       //去除右边空格（选定结束位置）
+       for(;len>start;){
+           if(s[len]!=' ')
+               break;
+           len--;
+       }
+       bool numberSeen = false,pointSeen=false,eSeen=false,numberAfterE=false;
+
+       for(int i=start;i<=len;i++){
+           char c = s[i];
+           if(c>='0' && c<='9'){
+               numberSeen = true;
+               numberAfterE = true;
+           }else if(c == '.'){
+               if(pointSeen || eSeen)
+                   return false;
+               pointSeen = true;
+           }else if(c=='e'){
+               if(eSeen || !numberSeen)
+                   return false;
+               eSeen = true;
+               numberAfterE = false;
+           }else if (c =='+' || c=='-'){
+               if(i!=start && s[i-1] !='e')
+                   return false;
+           }else{
+               return false;
+           }
+       }
+       return numberSeen && numberAfterE;
+   }
+----

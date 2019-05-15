@@ -1,0 +1,43 @@
+== plus-one
+
+=== 题目描述
+----
+Given a number represented as an array of digits, plus one to the number.
+----
+=== 分析
+给出一个数组标示的数字，对数字进行+1操作，进行+1可能涉及到进位，进位到最后可能就涉及到熬整个数的位数边长
+我们来看一下：
+----
+ [9,9,9]  + 1 = [1,0,0,0]
+----
+
+其实就设计到有个标志位 Tag，标示每一位累加后进位值，循环从后向前累加，最后如果 Tag>0 则向数组开头位置
+插入Tag
+
+
+=== 考察点
+
+ 数组，进位细节处理
+
+=== 代码
+
+----
+class Solution {
+public:
+    vector<int> plusOne(vector<int> &digits) {
+        int tag=1;
+        for(int i=digits.size()-1;i>=0;i--){
+            if(tag != 0){
+                digits[i] = digits[i]+tag;
+                tag = digits[i]/10;
+                digits[i] = digits[i]%10;
+            }else{
+                break;
+            }
+        }
+        if(tag>0)
+            digits.insert(digits.begin(),tag);
+        return digits;
+    }
+};
+----

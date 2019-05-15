@@ -1,0 +1,69 @@
+== add-binary
+
+=== 题目描述
+
+----
+
+Given two binary strings, return their sum (also a binary string).
+
+For example,
+a ="11"
+b ="1"
+Return"100".
+----
+
+=== 分析
+给定两个 用二进制标示的字符串（“001001”），返回两者二进制相加后的值
+思路1：
+将两个字符转换为10进制，相加后再转换为string 的二进制，表面看很简单，其实中间这几部转换不太容易
+思路2：
+两个字符串，补0后长度对齐，然后从后向前按位累加（a[i]+b[i]+flag - 3*'0'）
+ 值为 3 标示 要进1 当前位为1 也需要进1
+ 值为 2 标示 要进1 当前位为0
+ 其余值 ，就将结果 给到当前位，然后进位为0
+最后判断进位，看是否需要进1
+
+=== 考察点
+字符串
+
+=== 代码
+----
+class Solution {
+public:
+    string addBinary(string a, string b) {
+        int len = max(a.size(),b.size());
+        //进位标志
+        int flag = '0';
+        string res(len+1,' ');
+        //先对齐 长度
+        while(len>a.size()){
+            a = '0' +a;
+        }
+        while(len >b.size()){
+            b = '0' +b;
+        }
+        //依次相加
+        for(int i=len-1;i>=0;i--){
+            int tmp = a[i]+b[i]+flag - 3*'0';
+            //tmp=3 标示要进位为1 ，并且flag = 1，tmp =2 标示flag =1 当前位为0  
+            if(tmp == 3){
+                res[i+1] = '1';
+                flag = '1';
+            }else if (tmp == 2){
+                res[i+1] = '0';
+                flag = '1';
+            }else {
+                res[i+1] = tmp+'0';
+                flag = '0';
+            }
+        }
+        //没有进位 从 下边 1 - end 字符串为所求，有进位 0 位置填写 flag
+        if(flag=='0')
+            return res.substr(1);
+        else{
+            res[0] = flag;
+        }
+        return res;
+    }
+};
+----

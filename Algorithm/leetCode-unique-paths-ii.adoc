@@ -1,0 +1,66 @@
+=== 题目描述
+----
+Follow up for "unique paths":
+Now consider if some obstacles are added to the grids. how many unique paths would there be ?
+An obstacle and empty space is marked ad 1 and 0 respectively in the grid .
+
+For example ,
+There is one obstacle in the middle of a 3*3 grid as illustrated below .
+[
+  [0,0,0],
+  [0,1,0],
+  [0,0,0]
+]
+The total number of unique paths is 2
+Note : m and n will be at most 100
+----
+
+=== 分析
+这个题在第一条的基础上增加了难度，并不在是所有的网格都能走，而是说有些网格不能走了。反观第一题其实就是一个动态规划。
+我们并没有实际去寻找究竟有多少种路径，我们只是在用加法原理来累加有多少种情况。
+而在这个第二题中，第一感觉就是需要找出所有路径，并且将包含 dp[i][j] == 1 的路径全部剔除，这是常规思路。
+其实在动态规划算法中，我们通过累加的前提是每个空格都给了一个默认值1 ，用来表示当前格最小能提供的次数。如果我们在赋值
+的时候讲 array[i][j] == 1 的这个对应位置以后（包括 i，j） 的位置都设置为0，或者说只有 array[i][j] == 0 的时候
+我们才设置dp[i][j] = 1 是否就可以套用第一题的动态规划算法了？
+
+=== 考察点
+
+动态规划，基于动态规划的解题思路
+
+=== 代码
+
+----
+class Solution {
+public:
+    int uniquePathsWithObstacles(vector<vector<int> > &obstacleGrid) {
+      int m = obstacleGrid.size();
+      int n = obstacleGrid[0].size();
+      vector<int> line(n,0);
+      vector <vector<int> >dp(m,line);
+      //最左侧 列 如果有一个为1 其余全部为 0 说明走不通了
+      for(int i=0;i<m;i++){
+        if (obstacleGrid[i][0] == 0)
+          dp[i][0] = 1 ;
+        else
+          break;
+      }
+      //最上排 如果有一个为1 其余也不用走了，全部为0 所以要break
+      for(int j=0;j<n;j++){
+        if(obstacleGrid[0][j]==0)
+            dp[0][j] = 1;
+        else
+            break;
+      }
+      for(int i=1;i<m;i++){
+          for(int j=1;j<n;j++){
+              //如果 为0 标示可以通行，1 不做处理，因为肯定为0
+              if(obstacleGrid[i][j]==0){
+                  dp[i][j] = dp[i-1][j]+dp[i][j-1];
+              }
+          }
+      }
+      return dp[m-1][n-1];
+
+    }
+};
+----
