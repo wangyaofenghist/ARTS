@@ -1,0 +1,83 @@
+=== 题目描述
+
+----
+given a list,rotate the list to the right by k places,where k is non-negative
+
+for example:
+given 1->2->3->4->5->NULL and k = 2
+return 4->5->1->2->3->NULL
+----
+
+=== 分析
+给定一个链表和一个数字k，将链表右侧k个元素旋转到左侧。k是一个非负数，
+1. 链表肯定是一个单项链表
+2. 旋转右侧的元素到左侧
+3. k > 0（需要考虑k>链表长度n应该如何处理   k = k % n ）
+基于以上三点，我们的思路有
+----
+1、链表连接成一个环，同时记录元素个数n，然后向前挪动n-k步后断开
+这样好像要跑接近 2n 个元素，时间负载的还是O(n)
+2、如果我们用一个头指针（C） 指向开头（C->next =  head），在初始化后两个指针（A，B）(A = head ，B = head )，一个（A）向前挪动k步，
+另一个（B）从头开始，向后挪动A到结尾的时候（A->next== null），A->next 应该指向开头，B->next 所指在位置就应该是新的开始，最后从 B->next
+处断开（B->next=null ）即可。
+----
+
+=== 考察点
+链表、模拟
+
+=== 代码
+1. 处理异常情况
+2. 初始化各种数据
+3. 算法主要思路表述
+----
+/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     ListNode *next;
+ *     ListNode(int x) : val(x), next(NULL) {}
+ * };
+ */
+ class Solution {
+public:
+    ListNode *rotateRight(ListNode *head, int k) {
+        //判断异常情况
+        if (k == 0 || head == NULL || head->next == NULL)
+            return head;
+        //处理k>链表长度的情况
+        ListNode *p=head;
+        int len = 0;
+        while(p)
+        {
+            ++len;
+            p = p->next;
+        }
+        k = k%len;
+        //先后指针思想，还有一种思想 得到长度 和修正后的k后，尾指针指向head，形成环，再向后走k步，断开即可
+        //指向头指针的指针
+        ListNode *headN = new ListNode(0);
+        //快指针先走 慢指针后走
+        ListNode *fast =head,*slow=head;
+        //next 指向链表头部
+        headN->next = head;
+        //快指针先走k步
+        for(int i=0;i<k;i++){
+            fast = fast->next;
+        }
+        //判断快指针是否是结尾，否则就同时向后走
+        while(fast->next !=NULL){
+            slow = slow->next;
+            fast = fast->next;
+        }
+        //形成环
+        fast->next = headN->next;
+        //改变指向头指针的指针
+        headN->next = slow->next;
+        //断开慢指针，此处就是新的链表结束点
+        slow->next = NULL;
+        //返回指向头指针的指针指向
+        return headN->next;
+
+    }
+};
+----
