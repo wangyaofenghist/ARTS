@@ -1,0 +1,85 @@
+=== 题目描述
+
+----
+spiral-matrix
+Given an integer n, generate a square matrix filled with elements from 1 to n 2 in spiral order.
+
+For example,
+Given n =3,
+
+You should return the following matrix:
+[
+ [ 1, 2, 3 ],
+ [ 8, 9, 4 ],
+ [ 7, 6, 5 ]
+]
+
+----
+
+=== 分析
+给定一个数字n，从1-n*n 个数，按照螺旋顺序排列成一个 n * n 的矩阵
+这个题一定要有方向感，左->右、上->下、右->左、下->上，每一个方向都应该是一个循环结束条件为当前行或列到达该转弯的地方
+----
+  int row_start = 0,col_start = 0,row_end=n-1,col_end=n-1;
+  //向右->
+  for(int i= col_start;i<=col_end;i++)
+      res[row_start][i] = count++;
+  //开始行 ++ 切换到下一行
+  row_start++;
+  for(int i=row_start;i<=row_end;i++)
+      res[i][col_end] = count++;
+  //结束列 -- 向左切换一列
+  col_end--;
+  //向左
+  for(int i=col_end;i>=col_start;i--)
+      res[row_end][i] = count++;
+  //结束行 -- 向上切换一行
+  row_end--;
+  //向上
+  for(int i=row_end;i>=row_start;i--)
+      res[i][col_start] = count++;
+  //开始列++ 向右切换一行
+  col_start++;
+----
+每走一遍就是一圈，直到 count == n*n 所有流程结束
+
+=== 考察点
+数组、细节
+
+=== 代码实现
+----
+class Solution {
+public:
+    //注意此题需要时刻保持方向感
+    vector<vector<int> > generateMatrix(int n) {
+        int total = n*n;
+        vector<int>line(n,0);
+        vector<vector <int> > res(n,line);
+        int count =1;
+        int row_start = 0,col_start = 0,row_end=n-1,col_end=n-1;
+        while(count <= total){
+            //向右->
+            for(int i= col_start;i<=col_end;i++)
+                res[row_start][i] = count++;
+            //开始行 ++ 切换到下一行
+            row_start++;
+            //向下
+            for(int i=row_start;i<=row_end;i++)
+                res[i][col_end] = count++;
+            //结束列 -- 向左切换一列
+            col_end--;
+            //向左
+            for(int i=col_end;i>=col_start;i--)
+                res[row_end][i] = count++;
+            //结束行 -- 向上切换一行
+            row_end--;
+            //向上
+            for(int i=row_end;i>=row_start;i--)
+                res[i][col_start] = count++;
+            //开始列++ 向右切换一行
+            col_start++;
+        }
+        return res;
+    }
+};
+----
