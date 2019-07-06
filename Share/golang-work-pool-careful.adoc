@@ -161,7 +161,7 @@ func (sc *DefaultScheduler) SyncTaskStatus(config *Config) {
 				if ok {
 					.....
 				}
-
+      //干掉这个分支，它真的没用，cpu 会降低到 正常，整个程序也就大概是1%左右
 			default:
 			}
 		}
@@ -179,4 +179,4 @@ go func(){
 在pprof导出的图中的呈现为
 image::../img/golang-work-pool-careful-44f3e.png[]
 
-纯粹的消耗cpu 连stopm 都不会有，记录一下仅仅作为工作中的积累。pprof 详细使用不进行介绍。
+纯粹的消耗cpu 连stopm 都不会有，如何优化，干掉 //default:  即可 记录一下仅仅作为工作中的积累。pprof 详细使用不进行介绍。
