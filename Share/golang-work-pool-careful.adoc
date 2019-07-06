@@ -140,7 +140,9 @@ func ConsumerTaskQueue() {
 看一结果，workPool 改动完之后，先不改动sleep，很明显 stepm 操作还有，但是sleep 对应的usleep 调用比例开始增加，猜想基本正确，此时本地跑cpu
 占用率跌到15%左右，但是还是难以接受
 
+
 image::../img/golang-work-pool-careful-9f89d.png[]
+
 
 继续优化，去掉sleep ,本地cpu 占用率 降低到 10%左右，想再降低？ 调整workerPool 的间隔时间 为 10 毫秒，基本可以降低到 3%左右。stop 几乎消失
 
@@ -177,6 +179,8 @@ go func(){
 }
 ----
 在pprof导出的图中的呈现为
+
 image::../img/golang-work-pool-careful-44f3e.png[]
+
 
 纯粹的消耗cpu 连stopm 都不会有，如何优化，干掉 //default:  即可 记录一下仅仅作为工作中的积累。pprof 详细使用不进行介绍。
