@@ -219,11 +219,7 @@ func timerproc(tb *timersBucket) {
 			if delta > 0 {
 				break
 			}
-<<<<<<< HEAD
       //在进行一遍调整 以便确认下一次的执行时间[when] 或者 移除一些 数据
-=======
-      //在进行一遍顺序调整 以便 一出一些 数据
->>>>>>> 1ff37cefb6dbf7a12f3ffe8373b3c0e5ee3adc1f
 			ok := true
 			if t.period > 0 {
 				// leave in heap but adjust next time to fire
