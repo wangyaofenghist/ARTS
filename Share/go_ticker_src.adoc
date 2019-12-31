@@ -1,0 +1,462 @@
+== go ticker 源码分析
+
+之前一直不太有时间去写文章，昨天因为一个问题，突然发现将之前看的源码相关的东西已经忘的差不多了，紧急补救一下，记录一下笔记！
+
+ticker 是go中的定时器，在 经常配合 for + select 来进行使用，以实现一个类似 crontab 定时任务的一个场景，只是触发时间间隔就是 ticker 在控制.
+----
+  var ticket = time.NewTicker(2 * time.Second)
+	for {
+		select {
+		case <-ticket.C:
+			fmt.Println(time.Now())
+		}
+	}
+----
+
+输出：
+
+----
+2019-12-31 14:59:09.341983 +0800 CST m=+2.002809178
+2019-12-31 14:59:11.34112 +0800 CST m=+4.001929179
+2019-12-31 14:59:13.341364 +0800 CST m=+6.002165169
+2019-12-31 14:59:15.344246 +0800 CST m=+8.005039488
+2019-12-31 14:59:17.343646 +0800 CST m=+10.004423090
+2019-12-31 14:59:19.344085 +0800 CST m=+12.004853947
+2019-12-31 14:59:21.339561 +0800 CST m=+14.000321943
+2019-12-31 14:59:23.339985 +0800 CST m=+16.000729647
+2019-12-31 14:59:25.344135 +0800 CST m=+18.004870916
+....
+----
+
+我们其实可以从代码中看出
+1. ticket.C 是一个 channel 类型，因此，我们可以大胆的猜测 time.NewTicker(2 * time.Second)  其实就是在构造一段代码，每隔 固定时间 向 time.C 内抛入一个数据，通过此种方式来完成定时任务的功能。
+2. 另外一点，channel 的出现一般意味着多个goroutine 直接的通信，所以 这个过程也许会启动一个 goroutine。我们接着来看源码实现。
+
+time/tick.go
+----
+package time
+
+import "errors"
+
+// A Ticker holds a channel that delivers `ticks' of a clock
+// at intervals.
+type Ticker struct {
+	C <-chan Time // The channel on which the ticks are delivered.
+	r runtimeTimer
+}
+
+// NewTicker returns a new Ticker containing a channel that will send the
+// time with a period specified by the duration argument.
+// It adjusts the intervals or drops ticks to make up for slow receivers.
+// The duration d must be greater than zero; if not, NewTicker will panic.
+// Stop the ticker to release associated resources.
+func NewTicker(d Duration) *Ticker {
+	if d <= 0 {
+		panic(errors.New("non-positive interval for NewTicker"))
+	}
+	// Give the channel a 1-element time buffer.
+	// If the client falls behind while reading, we drop ticks
+	// on the floor until the client catches up.
+	c := make(chan Time, 1)
+	t := &Ticker{
+		C: c,
+		r: runtimeTimer{
+			when:   when(d),
+			period: int64(d),
+			f:      sendTime,
+			arg:    c,
+		},
+	}
+	startTimer(&t.r)
+	return t
+}
+
+// Stop turns off a ticker. After Stop, no more ticks will be sent.
+// Stop does not close the channel, to prevent a concurrent goroutine
+// reading from the channel from seeing an erroneous "tick".
+func (t *Ticker) Stop() {
+	stopTimer(&t.r)
+}
+
+// Tick is a convenience wrapper for NewTicker providing access to the ticking
+// channel only. While Tick is useful for clients that have no need to shut down
+// the Ticker, be aware that without a way to shut it down the underlying
+// Ticker cannot be recovered by the garbage collector; it "leaks".
+// Unlike NewTicker, Tick will return nil if d <= 0.
+func Tick(d Duration) <-chan Time {
+	if d <= 0 {
+		return nil
+	}
+	return NewTicker(d).C
+}
+
+----
+我们从源码中可以印证了第一点的channel 类型，接着看启动函数
+----
+startTimer(&t.r)
+----
+函数源码实现在 runtime/time.go 目录，这里多说一句，如果发现源码只是一个定义，一般来说有两种可能 一种就是 会在汇编存在同名 函数，也就是是汇编实现，另一种就是本次我们看到的，通过 go::linkname 关键词将函数之间进行关联。所以可以全局搜索看一下，具体实现方式。
+
+runtime/time.go 中的具体实现
+----
+// startTimer adds t to the timer heap.
+//go:linkname startTimer time.startTimer
+func startTimer(t *timer) {
+	if raceenabled {
+		racerelease(unsafe.Pointer(t))
+	}
+	addtimer(t)
+}
+----
+
+raceenabled  其实可以暂时忽略，只有在 build 和 run 命令跟上 -race 是才会启用，源码上有关键词 // +build !race  ，在此不再累述。我们直接看 addtimer(t) 向下流程;
+
+timersBucket 结构
+----
+//go:notinheap
+type timersBucket struct {
+	lock         mutex
+	gp           *g
+	created      bool
+	sleeping     bool
+	rescheduling bool
+	sleepUntil   int64
+	waitnote     note
+	t            []*timer  //存储的 定时器
+}
+
+----
+addtimer:
+----
+func addtimer(t *timer) {
+  //获取当前对象的 bucket
+	tb := t.assignBucket()
+  //加锁
+	lock(&tb.lock)
+  //将定时对象加入  bucket
+	ok := tb.addtimerLocked(t)
+  //解锁
+	unlock(&tb.lock)
+  //判断是否ok
+	if !ok {
+		badTimer()
+	}
+}
+
+// Add a timer to the heap and start or kick timerproc if the new timer is
+// earlier than any of the others.
+// Timers are locked.
+// Returns whether all is well: false if the data structure is corrupt
+// due to user-level races.
+func (tb *timersBucket) addtimerLocked(t *timer) bool {
+	// when must never be negative; otherwise timerproc will overflow
+	// during its delta calculation and never expire other runtime timers.
+	if t.when < 0 {
+		t.when = 1<<63 - 1
+	}
+  //判断当前 bucket中的定时任务个数
+	t.i = len(tb.t)
+  //将 t 添加到全局 Bucket tb.t 中
+	tb.t = append(tb.t, t)
+  //这是一个小根堆算法 对 整个定时任务队列进行 调整（以保证小的放到最开始）
+	if !siftupTimer(tb.t, t.i) {
+		return false
+	}
+  //为0 标示这是第一个定时任务，需要进行一系列的设置
+	if t.i == 0 {
+		// siftup moved to top: new earliest deadline.
+    //如果正在休眠， 则进行唤醒
+		if tb.sleeping && tb.sleepUntil > t.when {
+			tb.sleeping = false
+			notewakeup(&tb.waitnote)
+		}
+    //如果正在调度，暂时到就绪状态
+		if tb.rescheduling {
+			tb.rescheduling = false
+			goready(tb.gp, 0)
+		}
+    //如果全局的tb 还没有创建，则进行标示，go 启动创建 （一个新的goroutine）
+    //其实后续检测也是在 timerproc 中实现
+		if !tb.created {
+			tb.created = true
+			go timerproc(tb)
+		}
+	}
+	return true
+}
+----
+
+我们重点来看一下 timerproc（tb）的过程
+----
+// Timerproc runs the time-driven events.
+// It sleeps until the next event in the tb heap.
+// If addtimer inserts a new earlier event, it wakes timerproc early.
+func timerproc(tb *timersBucket) {
+  //getg  用于获取当前g的地址 在编译阶段会进程重写。
+  // 此处主要是第一次执行将 当前g与tb.gp 的结构体绑定
+	tb.gp = getg()
+  //死循环，保证一直在运行
+	for {
+    //加锁
+		lock(&tb.lock)
+    //设置睡眠状态
+		tb.sleeping = false
+    //当前时间
+		now := nanotime()
+    //默认没有过定时间 与当前的时间差
+		delta := int64(-1)
+    //开始循环遍历所有的 tb.t 中的定时器
+		for {
+      //为空直接退出
+			if len(tb.t) == 0 {
+				delta = -1
+				break
+			}
+      //取第0个 因为是小根堆，第0个就是最近到期的
+			t := tb.t[0]
+			delta = t.when - now
+      //时间差大于0  退出当前循环 没有必要向后走因为后面的数据差值一定更大
+			if delta > 0 {
+				break
+			}
+      //在进行一遍调整 以便确认下一次的执行时间[when] 或者 移除一些 数据
+			ok := true
+			if t.period > 0 {
+				// leave in heap but adjust next time to fire
+				t.when += t.period * (1 + -delta/t.period)
+				if !siftdownTimer(tb.t, 0) {
+					ok = false
+				}
+			} else {
+				// remove from heap
+				last := len(tb.t) - 1
+				if last > 0 {
+					tb.t[0] = tb.t[last]
+					tb.t[0].i = 0
+				}
+				tb.t[last] = nil
+				tb.t = tb.t[:last]
+				if last > 0 {
+					if !siftdownTimer(tb.t, 0) {
+						ok = false
+					}
+				}
+				t.i = -1 // mark as removed
+			}
+			f := t.f
+			arg := t.arg
+			seq := t.seq
+			unlock(&tb.lock)
+			if !ok {
+				badTimer()
+			}
+			if raceenabled {
+				raceacquire(unsafe.Pointer(t))
+			}
+      //在定时器中就是 sendTime 函数，arg 就是定时器中C 就是向 C 中发送当前时间
+      //此时其实就是在触发定时器
+			f(arg, seq)
+      //执行完此时就会开始下一轮循环 所以先加上锁
+			lock(&tb.lock)
+		}
+    //说明已经没有任何需要调度的定时器
+    //先sleep 接着参与后续（下一轮）调度
+    //重新添加定时器时候会触发唤醒
+		if delta < 0 || faketime > 0 {
+			// No timers left - put goroutine to sleep.
+			tb.rescheduling = true
+			goparkunlock(&tb.lock, waitReasonTimerGoroutineIdle, traceEvGoBlock, 1)
+			continue
+		}
+    //进入sleep 状态 休眠一定时间
+		// At least one timer pending. Sleep until then.
+		tb.sleeping = true
+    //sleep 终止时间
+		tb.sleepUntil = now + delta
+		noteclear(&tb.waitnote)
+		unlock(&tb.lock)
+		notetsleepg(&tb.waitnote, delta)
+	}
+}
+
+----
+runtime/lock_sema.go
+
+----
+// same as runtime·notetsleep, but called on user g (not g0)
+// calls only nosplit functions between entersyscallblock/exitsyscall
+func notetsleepg(n *note, ns int64) bool {
+	gp := getg()
+  //判断是否处于内核线程中 每个m 都有g0，代表系统栈，不能被调度程序抢占
+  //调度程序也是泡仔g0
+	if gp == gp.m.g0 {
+		throw("notetsleepg on g0")
+	}
+	semacreate(gp.m)
+	entersyscallblock()
+  //休眠n纳秒 如何实现 pthread_cond_timedwait	/ pthread_cond_wait
+	ok := notetsleep_internal(n, ns, nil, 0)
+	exitsyscall()
+	return ok
+}
+----
+至此其实整个主流程就完成了，其实如何理解定时休眠呢？可以想一想sleep 不就类似吗？ 休眠其实就是不参与调度而已，只是 golang 中的sleep 是从协程维度（g）的。但是 notetsleep_internal调用的是 semasleep 最后调用的pthread_cond_timedwait_relative_np 调用libc 中的库函数实现，既然如此那么这就是从线程（m）维度 进行的sleep。
+----
+//go:nosplit
+func notetsleep_internal(n *note, ns int64, gp *g, deadline int64) bool {
+	// gp and deadline are logically local variables, but they are written
+	// as parameters so that the stack space they require is charged
+	// to the caller.
+	// This reduces the nosplit footprint of notetsleep_internal.
+	gp = getg()
+
+	// Register for wakeup on n->waitm.
+	if !atomic.Casuintptr(&n.key, 0, uintptr(unsafe.Pointer(gp.m))) {
+		// Must be locked (got wakeup).
+		if n.key != locked {
+			throw("notetsleep - waitm out of sync")
+		}
+		return true
+	}
+	if ns < 0 {
+		// Queued. Sleep.
+		gp.m.blocked = true
+		if *cgo_yield == nil {
+			semasleep(-1)
+		} else {
+			// Sleep in arbitrary-but-moderate intervals to poll libc interceptors.
+			const ns = 10e6
+			for semasleep(ns) < 0 {
+				asmcgocall(*cgo_yield, nil)
+			}
+		}
+		gp.m.blocked = false
+		return true
+	}
+
+	deadline = nanotime() + ns
+	for {
+		// Registered. Sleep.
+		gp.m.blocked = true
+		if *cgo_yield != nil && ns > 10e6 {
+			ns = 10e6
+		}
+		if semasleep(ns) >= 0 {
+			gp.m.blocked = false
+			// Acquired semaphore, semawakeup unregistered us.
+			// Done.
+			return true
+		}
+		if *cgo_yield != nil {
+			asmcgocall(*cgo_yield, nil)
+		}
+		gp.m.blocked = false
+		// Interrupted or timed out. Still registered. Semaphore not acquired.
+		ns = deadline - nanotime()
+		if ns <= 0 {
+			break
+		}
+		// Deadline hasn't arrived. Keep sleeping.
+	}
+
+	// Deadline arrived. Still registered. Semaphore not acquired.
+	// Want to give up and return, but have to unregister first,
+	// so that any notewakeup racing with the return does not
+	// try to grant us the semaphore when we don't expect it.
+	for {
+		v := atomic.Loaduintptr(&n.key)
+		switch v {
+		case uintptr(unsafe.Pointer(gp.m)):
+			// No wakeup yet; unregister if possible.
+			if atomic.Casuintptr(&n.key, v, 0) {
+				return false
+			}
+		case locked:
+			// Wakeup happened so semaphore is available.
+			// Grab it to avoid getting out of sync.
+			gp.m.blocked = true
+			if semasleep(-1) < 0 {
+				throw("runtime: unable to acquire - semaphore out of sync")
+			}
+			gp.m.blocked = false
+			return true
+		default:
+			throw("runtime: unexpected waitm - semaphore out of sync")
+		}
+	}
+}
+----
+
+
+----
+//go:nosplit
+func semasleep(ns int64) int32 {
+	var start int64
+	if ns >= 0 {
+		start = nanotime()
+	}
+	mp := getg().m
+	pthread_mutex_lock(&mp.mutex)
+	for {
+		if mp.count > 0 {
+			mp.count--
+			pthread_mutex_unlock(&mp.mutex)
+			return 0
+		}
+		if ns >= 0 {
+			spent := nanotime() - start
+			if spent >= ns {
+				pthread_mutex_unlock(&mp.mutex)
+				return -1
+			}
+			var t timespec
+			t.setNsec(ns - spent)
+			err := pthread_cond_timedwait_relative_np(&mp.cond, &mp.mutex, &t)
+			if err == _ETIMEDOUT {
+				pthread_mutex_unlock(&mp.mutex)
+				return -1
+			}
+		} else {
+			pthread_cond_wait(&mp.cond, &mp.mutex)
+		}
+	}
+}
+----
+对比一 go 中的 time.sleep() 的实现
+----
+// Package time APIs.
+// Godoc uses the comments in package time, not these.
+
+// time.now is implemented in assembly.
+
+// timeSleep puts the current goroutine to sleep for at least ns nanoseconds.
+//go:linkname timeSleep time.Sleep
+func timeSleep(ns int64) {
+	if ns <= 0 {
+		return
+	}
+
+	gp := getg()
+	t := gp.timer
+	if t == nil {
+		t = new(timer)
+		gp.timer = t
+	}
+	*t = timer{}
+	t.when = nanotime() + ns
+	t.f = goroutineReady
+	t.arg = gp
+	tb := t.assignBucket()
+	lock(&tb.lock)
+	if !tb.addtimerLocked(t) {
+		unlock(&tb.lock)
+		badTimer()
+	}
+	goparkunlock(&tb.lock, waitReasonSleep, traceEvGoSleep, 2)
+}
+
+----
+
+sleep的实现其实也是一个timer结构体，放入了bucket 有一个协程不停的轮训，只是不同点在于，显示调用了 goparkunlock 是从协程维度进入了休眠（不参与调度）， 但是整个唤醒流程和 ticket 是相同的。
+
+以上仅仅作为笔记
