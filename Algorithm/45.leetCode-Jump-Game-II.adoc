@@ -1,0 +1,110 @@
+== Jump Game II
+=== 题目描述
+----
+Given an array of non-negative integers, you are initially positioned at the first index of the array.
+
+Each element in the array represents your maximum jump length at that position.
+
+Your goal is to reach the last index in the minimum number of jumps.
+
+Example:
+
+Input: [2,3,1,1,4]
+Output: 2
+Explanation: The minimum number of jumps to reach the last index is 2.
+    Jump 1 step from index 0 to 1, then 3 steps to the last index.
+Note:
+
+You can assume that you can always reach the last index.
+----
+
+=== 题目分析
+
+本题是 jump game i 的 延伸，给定一个数组，每个数组的数表示从当前位置能向前走的最大步数，首先保证 没有负数，然后从第一个下标开始，目标是在最少的跳数中达到最后的索引。第一题在于要验证是否能走到最后一位元素，第二题的点在于告诉你一定是可以走到最后的，但是要求最少经过几次跳跃。
+
+第一个反应，就是穷举。挨个试，问题在于如果这样这是一个回溯的基本结构（循环 + 递归 ），同时求出最小次数，时间复杂度有点高。
+我们来尝试实现一下
+----
+//return dpHelper(nums,0);
+
+int dpHelper(vector<int> &nums,int p){
+  int n = nums.size();
+  //结束条件
+  if (p >= n-1){
+    return 0;
+  }
+  //加入dp dp被初始化为 数组长度 n
+  if(dp[p] != n ){
+    return dp[p];
+  }
+  int steps = nums[p];
+  for(int i=1;i<=steps;i++){
+    int subProblem = dpHelper(nums,p+i);
+    dp[i] = min(memo[p],subProblem+1);
+  }
+  return dp[p];
+}
+----
+自下而上的思考
+我们只需要不停的尝试 从 0-i 中那些 下标能够超过当前坐标 i，A[j] + j >=i ,如果满足 dp[i] = dp[j]+1
+----
+class Solution {
+public:
+    int jump(int A[], int n)
+    {
+        vector<int> dp(n,0);
+        if(n==0)    return 0;
+        for(int i=0;i<n;i++)
+        {
+            for(int j=0;j<i;++j)
+            {
+                if(A[j]+j>=i)
+                {
+                    dp[i]=dp[j]+1;
+                    break;
+                }
+            }
+        }
+        return dp[n-1];
+    }
+};
+
+----
+
+贪心算法
+我们依照 递归形态下的动态规划
+看一下核心的逻辑 , 穷举一个小范围内所有的可能并取到最小值。
+回头来看，如果想让整个过程次数最小，每次跳跃步长应该尽力的大，只要跳跃步长足够大，后续选择机会就足够多的。
+----
+//自上向下
+int steps = nums[p];
+for(int i=1;i<=steps;i++){
+  int subProblem = dpHelper(nums,p+i);
+  dp[i] = min(memo[p],subProblem+1);
+}
+---
+//自低向上
+for(int j=0;j<i;++j)
+{
+    if(A[j]+j>=i)
+    {
+        dp[i]=dp[j]+1;
+        break;
+    }
+}
+----
+这段是将 大问题转换为小问题的核心，我们需要拆分出它所具有的贪心性质才可能替换掉他。潜在的贪心性质 就是 我们要找最大的步长
+
+----
+int farthest = 0,end = 0;
+int n = nums.size();
+int jumps = 0;
+for(int i=0;i<n-1; i++){
+  farthest = max(nums[i] +i ,farthest);
+  if(end == i){
+    jumps ++;
+    end = farthest;
+  }
+}
+return jumps;
+----

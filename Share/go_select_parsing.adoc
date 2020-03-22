@@ -1,0 +1,120 @@
+=== go select 源码分析
+
+golang中的 select 无疑是一个很优秀的特性，看到 'select' 这个关键字，第一个就想到的就是linux的select、poll、epoll等相关的io多路复用，再想就是sql 中的 ’select * from xxx '，但是从此之后还有一个select 是属于golang 所特有的。
+
+go 的select 与linux也有异曲同工之妙，只是linux 用于响应网络io，go用于对通信机制（channel 的发送）的一个响应（case 后面一定是一个 chan -> 或者 <-chan 的形式  ），等于是一个语言层面的select，这样就很容易理解了。
+
+NOTE: 梳理一下关于select 的基本用法
+
+****
+. 如果多个通道都阻塞了（没有default），会阻塞直到其中一个通道可以处理（发送或者接收）。
+. 如果多个通道都可以处理，随机选取一个处理。
+. 有default选项，当其他case 阻塞时会走default。（永远是可以运行的）
+. 如果防止select堵塞，可以写default来确保发送不被堵塞，没有case的select就会一直堵塞.
+. 当select做选择case和default操作时，case的优先级大于default（case阻塞才会default）。
+. select语句实现了一种监听模式，我们可也在无限循环中使用，通过break来退出循环（有点像linux中的select 了）。
+
+.样例
+----
+  var c = make(chan int64, 10)
+  func selectTest2() {
+  	for {
+  		select {
+  		case <-c:
+  			fmt.Println("select Send")
+  		case c <- time.Now().Unix():
+  			fmt.Println("select Recover")
+  		default:
+  			fmt.Println("select Default")
+  		}
+  	}
+  }
+----
+****
+
+
+icon:tags[role="blue"]  源码位置：runtime/select.go +
+
+首先来找一些核心的操作基本上都是在runtime 中，粗略看一下select.go 的文件大致有几个重要的结构体
+----
+1. hselect         select 对应 的结构体
+2. scase           select 中对应的case 对应的结构体
+3. waitq           从字面理解 等待队列
+4. hchan           channel 对应的结构体 （包含在runtime/chan.go）
+5. runtimeSelect   等同于 reflect/value.go 中的 runtimeSelect
+6. selectDir       等同于 reflect/value.go:/SelectDir
+----
+其次我们梳理一下并罗列一下 select.go 中主要的函数
+----
+1.newselect (sel *hselect, selsize int64, size int32)
+    新建一个select，
+    sel 就是select对应结构体，
+    selsize 通过size+算法 可用得到的一个大小（有点像占用空间大小）
+    size 标示case 的个数
+
+2. selectsize(size uintptr) uintptr
+    根据size计算出selsize （select的占用空间大小）
+
+3. selectsend(sel *hselect, c *hchan, elem unsafe.Pointer)
+    对应发送的场景 case <-channelA  :
+4. selectrecv(sel *hselect, c *hchan, elem unsafe.Pointer, received *bool)
+    对应接受的场景 case channel<- xxxx:
+5. selectdefault(sel *hselect)
+    对应默认操作符  defalut:
+----
+相关关辅助函数
+----
+1. sellock(scases []scase, lockorder []uint16)
+   按照 lockorder数组中的数据x对 下标为x的scase对应的case 进行加锁操作
+
+2. selunlock(scases []scase, lockorder []uint16)
+   按照 lockorder数组中的数据x对 下标为x的scase对应的case 进行解锁操作
+
+3. selparkcommit(gp *g, _ unsafe.Pointer) bool
+
+4. func reflect_rselect(cases []runtimeSelect) (chosen int, recvOK bool) {
+   reflect.rselect  所对应的原型函数
+5. block()
+6. func (q *waitq) dequeueSudoG(sgp *sudog) {
+
+----
+icon:tags[role="blue"] 重点介绍一下 selectgo (sel *hselect) int
+这个函数目测是展露了360多行，已经是整个 select.go 文件的一半了，所有它才是银弹...
+selectgo 里面大量使用了goto，我们先来梳理一下 goto 所对应的标签
+----
+0. 首先将select中的case 进行重排，
+1. loop      扫描所有的case 等待有事件响应，如果没有事件响应 goto loop
+  1.1 查找所有case 看是否在发送、接受队列中有等待的消息 如果有 调用相应命令，如果已经关闭调用相应关闭命令
+  1.2 按照锁定的顺序获取case，放入相应的发送接收队列（入队） ，将当前g休眠，等待selparkcommit去唤醒
+  1.3 对于第三部一定是 G 被唤醒了，锁定 case，
+2. bufrecv
+   2.1
+3. bufsend
+4. recv
+5. rclose
+6. send
+7. retc
+8. sclose
+----
+
+
+reflect.Select  //reflect/value.go
+
+[qanda]
+
+select 如何变成调用select.go 中的操作的?::
+====
+
+首先我们明确一些东西，go属于编译行语言，所以在执行go之前我们其实是至少需要经历“词法分析”、“语法分析”的过程，其实go在词法语法分析之后还有一个 “中间代码生成（ssa）”、“机器码生成”的过程。其实就是在ssa这一步完成的select、channel、make、defer 等关键词的替换的。大致介绍一下这几个步骤。
+
+
+. 词法分析，对go源代码进行分割成一个一个的标记（token）序列的过程
+. 语法分析，根据词法分析生成的序列进行词法上的校验（写错代码了，在这里就会被分析出来）
+. ssa，对源代码生成的标记序列中一些操作进行替换、重新生成，其实是一个优化的过程
+. 机器码生成，终于到了最后一步了，go底层用的是plan9汇编，在这一步骤，会根据平台差异，生成相关二进制代码。
+
+====
+
+
+
+https://studygolang.com/articles/239

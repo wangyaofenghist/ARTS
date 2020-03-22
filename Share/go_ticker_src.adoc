@@ -220,14 +220,18 @@ func timerproc(tb *timersBucket) {
 				break
 			}
       //在进行一遍调整 以便确认下一次的执行时间[when] 或者 移除一些 数据
+
 			ok := true
 			if t.period > 0 {
+        //距离执行的间隔时间 小于零才能进入， 说明是对下一周期 触发时间 进行设置，然后从新进行 调整顺序 -delta/t.period  其实是在计算一个周期  t.period 不为0 就是间隔时间
+
 				// leave in heap but adjust next time to fire
 				t.when += t.period * (1 + -delta/t.period)
 				if !siftdownTimer(tb.t, 0) {
 					ok = false
 				}
 			} else {
+        //其实是把最后一个元素置为第一个 然后 进行一次从 头到未的调整,间接的把第一个个元素干掉了
 				// remove from heap
 				last := len(tb.t) - 1
 				if last > 0 {

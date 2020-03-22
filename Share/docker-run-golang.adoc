@@ -14,7 +14,7 @@
 8. docker run    //运行一个镜像
    例如：
    docker run -it ubuntu /bin/bash
-   docker run zzz -p 8800：8800 -it /bin/bash
+   docker run scm -p 8800：8800 -it /bin/bash
 9. docker attach  “containerId”    //重新进入容器
 10. docker stop/start/restart “containerId”   //停止，启动，重启 容器
 11. docker build                              //构建一个 镜像
@@ -95,3 +95,46 @@ VOLUME	Creates a shared volume that can be shared among containers or by the hos
 WORKDIR	Set the default working directory for the container
 ----
 link/link:http://odewahn.github.io/docker-jumpstart/building-images-with-dockerfiles.html[DockerFile]
+
+
+docker run --name elasticsearch_test  -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node"    elasticsearch
+
+
+docker run --link elasticsearch_test --name kibana_test -p 5601:5601  -it  wangyaofeng/kibana:vim    /bin/bash
+
+vim /etc/kibana/kibana.yml
+//修改默认 配置中的 elasticsearch：9200 为 elasticsearch_test：9200
+kibina
+
+/usr/local/var/log/nginx
+配置文件 写好，elashticsearch 配置好即可使用
+docker run -it --link elasticsearch_test --name logstash_test  --rm -v "$PWD":/usr/share/logstash/pipeline/ logstash:config -f /usr/share/logstash/pipeline/logstash.conf
+docker run  --link elasticsearch_test --name logstash_test  --rm -v "$PWD":/usr/share/logstash/pipeline/ -v /usr/local/var/log/nginx/:/usr/local/var/log/nginx/ logstash:config -f /usr/share/logstash/pipeline/logstash.conf
+
+
+docker run -it --link elasticsearch_test --name logstash_test  --rm -v /usr/local/var/log/nginx/:/usr/local/var/log/nginx/ logstash:config
+
+docker run --name logstash_test  -v /usr/local/var/log/:/var/log  logstash
+docker run --name logstash_test  --link elasticsearch_test   --rm -v /usr/local/var/log/:/var/log logstash -e "
+file {
+      path => ["/usr/local/var/log/nginx/access.log"]
+      codec => "json"
+      type => "nginx-access-log"
+  }
+   } output { elasticsearch {
+      hosts => ["elasticsearch_test:9200"]
+      index => "nginx-access-log-%{+YYYY.MM.dd}"
+      }
+       }
+"
+$ docker run --name logstash_test --link elasticsearch_test -d -v /var/log/:/var/log -it --rm logstash -e 'input {
+  file {
+        path => ["/usr/local/var/log/nginx/access.log"]
+        codec => "json"
+        type => "nginx-access-log"
+    }
+     } output { elasticsearch {
+        hosts => ["elasticsearch_test:9200"]
+        index => "nginx-access-log-%{+YYYY.MM.dd}"
+        }
+         }'
