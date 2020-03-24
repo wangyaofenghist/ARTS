@@ -1,0 +1,86 @@
+== reconstruct-itinerary
+
+=== 题目描述
+====
+给定一个机票的字符串二维数组 [from, to]，子数组中的两个成员分别表示飞机出发和降落的机场地点，对该行程进行重新规划排序。所有这些机票都属于一个从JFK（肯尼迪国际机场）出发的先生，所以该行程必须从 JFK 出发。
+
+说明:
+----
+1. 如果存在多种有效的行程，你可以按字符自然排序返回最小的行程组合。例如，行程 ["JFK", "LGA"] 与 ["JFK", "LGB"] 相比就更小，排序更靠前
+2. 所有的机场都用三个大写字母表示（机场代码）。
+3. 假定所有机票至少存在一种合理的行程。
+----
+示例 1:
+----
+输入: [["MUC", "LHR"], ["JFK", "MUC"], ["SFO", "SJC"], ["LHR", "SFO"]]
+输出: ["JFK", "MUC", "LHR", "SFO", "SJC"]
+----
+示例 2:
+----
+输入: [["JFK","SFO"],["JFK","ATL"],["SFO","ATL"],["ATL","JFK"],["ATL","SFO"]]
+输出: ["JFK","ATL","JFK","SFO","ATL","SFO"]
+解释: 另一种有效的行程是 ["JFK","SFO","ATL","JFK","ATL","SFO"]。但是它自然排序更大更靠后。
+----
+
+====
+
+=== 分析
+有了起点 JFK， 有了所有的行程列表[[form,to]] ,需要 走遍所有的点。 有点类似于”图“
+首先我们可以构造出来一个 数据结构 map 来标示这个图  [from,[to1,to2,to3]]
+我们看一下如何构造
+----
+//multiset 会自动按照 字母顺序排序
+ map<string,multiset<string>> tmpMap;
+ for(auto val : tickets){
+     tmpMap[val[0]].insert(val[1]);
+ }
+----
+至此这道题演变为了一个深度遍历，需要注意 to1,t2,t3 最好遵循排过序的顺序。
+我们来看一下 dfs 的基本代码结构
+----
+stack <string> st;
+st.push(“JFK”);
+while(!st.empty()){
+  string s = st.top();
+  if(tmpMap.find(s) != tmpMap.end() && tmpMap[s].size() > 0){
+    st.push(*tmpMap[s].begin());
+    tmpMap[s].erase(tmpMap[s].begin);
+  }else{
+    res.insert(res.begin(),s);
+    st.pop();
+  }
+}
+return res;
+----
+
+=== 代码
+----
+class Solution {
+public:
+    vector<string> findItinerary(vector<vector<string>>& tickets) {
+        vector<string> res;
+        if(tickets.size() == 0){
+            return res;
+        }
+        //multiset 会自动按照 字母顺序排序
+        map<string,multiset<string>> tmpMap;
+        for(auto val : tickets){
+            tmpMap[val[0]].insert(val[1]);
+        }
+        //为什么要用栈，因为这是深度遍历
+        stack <string> st;
+        st.push("JFK");
+        while(!st.empty()){
+            string s = st.top();
+            if(tmpMap.find(s) != tmpMap.end() && tmpMap[s].size()>0){
+                st.push(*tmpMap[s].begin());
+                tmpMap[s].erase(tmpMap[s].begin());
+            }else{
+                res.insert(res.begin(),s);
+                st.pop();
+            }
+        }
+        return res;
+    }
+};
+----
