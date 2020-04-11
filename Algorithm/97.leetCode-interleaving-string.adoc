@@ -1,0 +1,171 @@
+== interleaving-string
+
+=== 题目描述
+
+====
+给定三个字符串 s1, s2, s3, 验证 s3 是否是由 s1 和 s2 交错组成的。
+
+示例 1:
+----
+输入: s1 = "aabcc", s2 = "dbbca", s3 = "aadbbcbcac"
+输出: true
+----
+示例 2:
+----
+输入: s1 = "aabcc", s2 = "dbbca", s3 = "aadbbbaccc"
+输出: false
+----
+====
+
+=== 分析
+此题是一个难度为hard 的题，我们首先看题意，其实可以理解为 根据 s1 与 s2 是否可以 顺序生成 s3。 常规思路 可以递归处理，从后向前每次对比一个 需要满足 s2[len-1] == s3[len-1] || s1[len-1] == s3[len-1].
+这个题是可以通过动态规划的方式实现，但是我们先尝试一下递归的实现：
+----
+helper(s1,l1,s2,l2,s3,l3){
+  if(l3 != l1+l2) return 0;
+  if(l1==0) return s2.substr(0,l2) == s3.substr(0,l3);
+  if(l2==0) return s1.substr(0,l1) == s3.substr(0,l3);
+  if(s3[l3-1] == s2[l2-1] && s3[l3-1] == s1[l1-1] ){
+    return helper(s1,l1,s2,l2-1,s3,l3-1) || helper(s1,l1-1,s2,l2,s3,l3-1);
+  }
+  if(s3[l3-1] == s2[l2-1])
+    return helper(s1,l1,s2,l2-1,s3,l3-1);
+  if(s3[l3-1] == s1[l1-1])
+    return helper(s1,l1-1,s2,l2,s3,l3-1);
+  return false;
+}
+----
+基于这个递归，我们只需要加一个dp 数组，存储递归过程中重复的返回结果即可，dp[l1][l2] 标示 s1 从 0-l1 与 s2 从 0-l2 的范围是否能够组成 s3的 0 - l1+l2 的字符
+改进一下
+----
+//自伤而下递归
+ bool helper(string &s1,int L1,string &s2,int L2,string &s3,int L3){
+     if(L3 != L1+L2){
+         return 0;
+     }
+     if (L1 == 0){
+         return s2.substr(0,L2) == s3.substr(0,L3);
+     }
+     if (L2 == 0){
+         return s1.substr(0,L1) == s3.substr(0,L3);
+     }
+     if(dp[L1][L2] != -1) {
+         return dp[L1][L2];
+     }
+     if(s1[L1-1] == s3[L3-1] && s2[L2-1] == s3[L3-1]){
+         dp[L1][L2-1] = helper(s1,L1,s2,L2-1,s3,L3-1);
+         dp[L1-1][L2] = helper(s1,L1-1,s2,L2,s3,L3-1);
+         return dp[L1][L2-1]  || dp[L1-1][L2];
+     }
+     if(s1[L1-1] == s3[L3-1]){
+         return dp[L1-1][L2] = helper(s1,L1-1,s2,L2,s3,L3-1);
+
+     }
+     if(s2[L2-1] == s3[L3-1]){
+         return dp[L1][L2-1] = helper(s1,L1,s2,L2-1,s3,L3-1);
+     }
+     return dp[L1][L2] = 0;
+ }
+----
+此时的状态转换方程已经呼之欲出了
+dp[i][j] = (dp[i-1][j] && s3[i+j-1] == s1[i-1]) ||  (dp[i][j-1] && s3[i+j-1] == s2[j-1])
+dp[0][j] = dp[0][i-1] && s3[j-1] == s2[j-1];
+dp[i][0] = dp[i-1][0] && s3[i-1] == s1[i-1];
+考虑将递归替换为自低线上
+----
+//自下而上递归
+    bool isInterleave2(string s1,string s2, string s3){
+        int n1 = s1.size(),n2 = s2.size(),n3 = s3.size();
+        vector <vector <bool>> dp2(n1+1,vector<bool>(n2+1,false) );
+        if(n1+n2 != n3){
+            return false;
+        }
+        dp2[0][0] = true;
+        for(int i=1;i<=n1;i++){
+            dp2[i][0] = dp2[i-1][0] && s1[i-1] == s3[i-1];
+        }
+        for(int j=1;j<=n2;j++){
+            dp2[0][j] = dp2[0][j-1] && s2[j-1] == s3[j-1];
+        }
+        for(int i=1;i<=n1;i++){
+            for(int j=1;j<=n2;j++){
+                dp2[i][j] =
+                (dp2[i-1][j] && s1[i-1] == s3[i+j-1])
+                ||
+                dp2[i][j-1] && s2[j-1] == s3[i+j-1];
+            }
+        }
+        return dp2[n1][n2];
+    }
+----
+
+=== 代码
+----
+class Solution {
+public:
+    vector<vector <int>> dp;
+    bool isInterleave(string s1, string s2, string s3) {
+       return isInterleave1(s1,s2,s3);
+       return isInterleave2(s1,s2,s3);
+
+    }
+    //自下而上递归
+    bool isInterleave2(string s1,string s2, string s3){
+        int n1 = s1.size(),n2 = s2.size(),n3 = s3.size();
+        vector <vector <bool>> dp2(n1+1,vector<bool>(n2+1,false) );
+        if(n1+n2 != n3){
+            return false;
+        }
+        dp2[0][0] = true;
+        for(int i=1;i<=n1;i++){
+            dp2[i][0] = dp2[i-1][0] && s1[i-1] == s3[i-1];
+        }
+        for(int j=1;j<=n2;j++){
+            dp2[0][j] = dp2[0][j-1] && s2[j-1] == s3[j-1];
+        }
+        for(int i=1;i<=n1;i++){
+            for(int j=1;j<=n2;j++){
+                dp2[i][j] =
+                (dp2[i-1][j] && s1[i-1] == s3[i+j-1])
+                ||
+                dp2[i][j-1] && s2[j-1] == s3[i+j-1];
+            }
+        }
+        return dp2[n1][n2];
+    }
+    bool isInterleave1(string s1, string s2, string s3){
+        int n1 = s1.size(),n2 = s2.size(),n3 = s3.size();
+        vector<vector<int>> dp1(n1+1,vector<int>(n2+1,-1));
+        dp = dp1;
+        return helper(s1,n1,s2,n2,s3,n3);
+    }
+    //自上而下递归
+    bool helper(string &s1,int L1,string &s2,int L2,string &s3,int L3){
+        if(L3 != L1+L2){
+            return 0;
+        }
+        if (L1 == 0){
+            return s2.substr(0,L2) == s3.substr(0,L3);
+        }
+        if (L2 == 0){
+            return s1.substr(0,L1) == s3.substr(0,L3);
+        }
+        if(dp[L1][L2] != -1) {
+            return dp[L1][L2];
+        }
+        if(s1[L1-1] == s3[L3-1] && s2[L2-1] == s3[L3-1]){
+            dp[L1][L2-1] = helper(s1,L1,s2,L2-1,s3,L3-1);
+            dp[L1-1][L2] = helper(s1,L1-1,s2,L2,s3,L3-1);
+            return dp[L1][L2-1]  || dp[L1-1][L2];
+        }
+        if(s1[L1-1] == s3[L3-1]){
+            return dp[L1-1][L2] = helper(s1,L1-1,s2,L2,s3,L3-1);
+
+        }
+        if(s2[L2-1] == s3[L3-1]){
+            return dp[L1][L2-1] = helper(s1,L1,s2,L2-1,s3,L3-1);
+        }
+        return dp[L1][L2] = 0;
+    }
+};
+----
