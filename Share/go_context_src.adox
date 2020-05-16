@@ -1,0 +1,207 @@
+== golang  context 源码分析
+
+context 在其他语言中很少出现，golang 中经常用它来处理超时操作，我们首先看一下他的用法
+常见的创建：
+----
+1.
+  ctx, cancel := context.WithCancel(context.Background())
+  cancel() :调用即可取消 触发 ctx.Done() 操作 配合time.AfterFunc(time.Second,cancel) 就可以实现定时触发
+2.
+  ctx := context.Background()
+	ctx, cancelFunc := context.WithTimeout(ctx, time.Second*4)
+	defer cancelFunc()
+----
+
+对取消动作的监听：
+----
+for{
+    select {
+    case <-ctx.Done():
+        //说明超时，可以做一些错误触发painc,或者终止操作
+        fmt.Println("test1 return")
+        return
+    default:
+        fmt.Println("default")
+        time.Sleep(1 * time.Second)
+
+    }
+}
+----
+我们看一下context 的使用过程
+----
+test(ctx );
+test2(ctx );
+----
+----
+func test(ctx context.Context){
+...
+  test(ctx)
+  ...
+}
+----
+以上即是context 的几个核心操作，我们先思考一下几个问题
+----
+1. ctx 一般会被层层传递，cannel 触发的时候 ctx.Done()  是否会同时触发（假如有多个协程呢？）
+2. ctx 在层层传递的时候如何保证层层递减。
+----
+我们先来解读一下源码
+----
+1. Context 是一个interface
+2. emptyCtx 实现了Context的interface 所谓的ctx 也就是它
+3. canceler 是一个interface
+4. cancelCtx 是一个结构体  实现了 canceler  返回的 cannel 就是它
+
+----
+----
+
+type emptyCtx int
+type Context interface {
+	Deadline() (deadline time.Time, ok bool)
+	Done() <-chan struct{}
+	Err() error
+	Value(key interface{}) interface{}
+}
+
+
+type canceler interface {
+	cancel(removeFromParent bool, err error)
+	Done() <-chan struct{}
+}
+type cancelCtx struct {
+	Context
+
+	mu       sync.Mutex            // protects following fields
+	done     chan struct{}         // created lazily, closed by first cancel call
+	children map[canceler]struct{} // set to nil by the first cancel call
+	err      error                 // set to non-nil by the first cancel call
+}
+
+
+----
+所有的操作几乎都是为找这两个数据对象，进行的各种组合操作
+首先 context 的定义方式本身就有点递归性质，所以各层向下传递的时候其实都是第一个的延伸
+无论是 context.WithCancel 还是 WithTimeout
+WithTimeout 源码：
+----
+func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc) {
+	return WithDeadline(parent, time.Now().Add(timeout))
+}
+func WithDeadline(parent Context, d time.Time) (Context, CancelFunc) {
+	if cur, ok := parent.Deadline(); ok && cur.Before(d) {
+		// The current deadline is already sooner than the new one.
+		return WithCancel(parent)
+	}
+	c := &timerCtx{
+		cancelCtx: newCancelCtx(parent),
+		deadline:  d,
+	}
+	propagateCancel(parent, c)
+	dur := time.Until(d)
+	if dur <= 0 {
+		c.cancel(true, DeadlineExceeded) // deadline has already passed
+		return c, func() { c.cancel(false, Canceled) }
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.err == nil {
+		c.timer = time.AfterFunc(dur, func() {
+			c.cancel(true, DeadlineExceeded)
+		})
+	}
+	return c, func() { c.cancel(true, Canceled) }
+}
+
+----
+
+WithCancel源码：
+----
+func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
+	c := newCancelCtx(parent)
+	propagateCancel(parent, &c)
+	return &c, func() { c.cancel(true, Canceled) }
+}
+// newCancelCtx returns an initialized cancelCtx.
+func newCancelCtx(parent Context) cancelCtx {
+	return cancelCtx{Context: parent}
+}
+
+// propagateCancel arranges for child to be canceled when parent is.
+func propagateCancel(parent Context, child canceler) {
+	if parent.Done() == nil {
+		return // parent is never canceled
+	}
+	if p, ok := parentCancelCtx(parent); ok {
+		p.mu.Lock()
+		if p.err != nil {
+			// parent has already been canceled
+			child.cancel(false, p.err)
+		} else {
+			if p.children == nil {
+				p.children = make(map[canceler]struct{})
+			}
+      //添加到子数组
+			p.children[child] = struct{}{}
+		}
+		p.mu.Unlock()
+	} else {
+		go func() {
+			select {
+			case <-parent.Done():
+				child.cancel(false, parent.Err())
+			case <-child.Done():
+			}
+		}()
+	}
+}
+----
+
+我们再来看一下cancel 操作是如何做到的
+----
+// cancel closes c.done, cancels each of c's children, and, if
+// removeFromParent is true, removes c from its parent's children.
+func (c *cancelCtx) cancel(removeFromParent bool, err error) {
+	if err == nil {
+		panic("context: internal error: missing cancel error")
+	}
+	c.mu.Lock()
+	if c.err != nil {
+		c.mu.Unlock()
+		return // already canceled
+	}
+	c.err = err
+	if c.done == nil {
+		c.done = closedchan
+	} else {
+		close(c.done)
+	}
+  //经典循环
+	for child := range c.children {
+		// NOTE: acquiring the child's lock while holding parent's lock.
+    //经典递归
+		child.cancel(false, err)
+	}
+	c.children = nil
+	c.mu.Unlock()
+
+	if removeFromParent {
+		removeChild(c.Context, c)
+	}
+}
+
+----
+也就是说我们在一层一层传递的时候 用 父节点的 ctx.Background()
+传递到了下一层中的 构建了ctx2，在取消的时候，循环递归调用即可层次通知。
+
+问题来了，我们如何控制时间，或者记录超时时间
+----
+type timerCtx struct {
+	cancelCtx
+	timer *time.Timer // Under cancelCtx.mu.
+
+	deadline time.Time
+}
+----
+其实至此 content 内的主要结构体就已经体现出来了，围绕这些主要结构实现的一系列功能就是局部意义，
+以供构建出一个灵活的组件。其实我们也不难看出，content的主要定位，还是围绕超时时间，定义的一个
+传输过程中的抽象和通知机制。我们使用的时候既然知道这个定位，就可以利用他及时的处理超时操作，特别
+是rpc 上下游调用处。就能很好的终止向下传递了。
